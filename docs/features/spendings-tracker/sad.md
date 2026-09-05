@@ -4,7 +4,7 @@ owner: "Dell"
 reviewers: ["Tech Lead", "Security Lead"]
 updated_at: "2026-09-05"
 feature_size: L
-target_surfaces: []
+target_surfaces: [backend-service]
 ---
 
 # Software Architecture Document — spendings-tracker
@@ -101,17 +101,17 @@ C4Context
 
 ## 4. Solution strategy
 
-<!-- 🎯 Why: the 3–4 STRATEGIC PILLARS every ADR grows from. Without §4 each ADR looks random —
-     there's no umbrella. ⭐ The densest section — the blast-radius gate fires almost always here
-     (decisions are irreversible + multi-module).
-     📋 Write: 3–4 choices; each a heading + 2–3 sentences of rationale.
-     📌 «Store content as a table of typed blocks» is a pillar — ADR-0001 grows from it. -->
-
 **Top strategic choices (the seeds for ADRs):**
 
-1. **<e.g. Module isolation through events>** — <2–3 sentences citing quality goals + constraints>.
-2. **<e.g. Single-store persistence>** — <2–3 sentences>.
-3. **<e.g. Server-rendered read side>** — <2–3 sentences>.
+1. **Own a single `backend-service` surface.** One Python process owns the monthly close. Telegram is the operator channel (command-and-reply conversation; `ux-flows.md` SCR-01–07), not a web, mobile, or desktop app. Downstream stages read `target_surfaces: [backend-service]` and do not re-derive it. There is no UI-architecture follow-on.
+
+2. **Use a Bot API adapter for the closer UI and a user-session (MTProto) adapter for harvest.** The closer’s private conversation (first-run, draft, suspects, save) is a bot chat. Harvest of a completed UTC month after the tool was off uses the closer’s group access via a user session, with no export file. The family group is never answered with draft or close detail. (ADR-0003)
+
+3. **Run the close pipeline synchronously in-process.** Ask for a month → harvest → on-machine spend-looking gate → shop-to-category map → language-model port → persist draft and egress list → show the private draft. The closer waits until the draft is visible. No second process and no in-process background job. (ADR-0004)
+
+4. **Apply the shop-to-category map before the model and skip the send on a hit.** A mapped shop (trim + case, exact remaining spelling) is filed from the map and does not leave the machine. Unmapped spend-looking lines may be sent. The closer can still override on the draft. (ADR-0005)
+
+Inherited, not re-opened: all durable state in one SQLite file (repo ADR-0003); closer pin is the Telegram account that finishes first-run (AC-01); language-model vendors stay behind a port (repo ADR-0002).
 
 Each tactical decision in later sections should trace to one of these seeds. Tactical decisions that *contradict* a strategic choice are red flags — surface them in §11.
 
