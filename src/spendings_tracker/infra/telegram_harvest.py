@@ -28,7 +28,9 @@ class TelegramHarvest:
         except AppError:
             raise
         except Exception as exc:
-            raise AppError(MONTH_NOT_OBTAINED) from exc
+            raise AppError(
+                MONTH_NOT_OBTAINED, "That month could not be obtained."
+            ) from exc
         if not messages:
-            raise AppError(MONTH_NOT_OBTAINED)
+            raise AppError(MONTH_NOT_OBTAINED, "That month could not be obtained.")
         return list(messages)

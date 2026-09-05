@@ -12,6 +12,8 @@ from spendings_tracker.__main__ import build_runtime
 from spendings_tracker.app.harvest_month import harvest_month
 from spendings_tracker.app.resume import resume
 from spendings_tracker.infra.sqlite import SqlitePersistence
+from spendings_tracker.infra.telegram_session import TelethonFamilyGroupReader
+from spendings_tracker.infra.uncategorized_vendor import UncategorizedVendor
 from spendings_tracker.ports.harvest import FamilyGroupMessage
 from spendings_tracker.ports.persistence import NewDraftLine
 
@@ -156,3 +158,7 @@ def test_build_runtime_constructs_and_injects_adapters(tmp_path: Path) -> None:
     assert bot._persistence is not None
     assert bot._harvest is not None
     assert bot._model is not None
+    assert isinstance(bot._harvest._reader, TelethonFamilyGroupReader)
+    assert isinstance(bot._model._vendor, UncategorizedVendor)
+    assert type(bot._harvest._reader).__name__ != "NullFamilyGroupReader"
+    assert type(bot._model._vendor).__name__ != "NullVendor"

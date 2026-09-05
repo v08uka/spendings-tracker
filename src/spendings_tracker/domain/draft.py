@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 
 
@@ -41,6 +41,22 @@ def make_draft_line(
     )
 
 
+def parse_amount(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    normalised = text.replace(",", ".", 1)
+    try:
+        value = Decimal(normalised)
+    except InvalidOperation:
+        return None
+    if not value.is_finite():
+        return None
+    return f"{value:.2f}"
+
+
 def is_suspect(line: DraftLine, *, default_currency: str) -> bool:
     if line.is_excluded:
         return False
@@ -63,7 +79,10 @@ def apply_handle(
     category_id: str | None = None,
 ) -> DraftLine:
     if choice is HandleChoice.ENTER_AMOUNT:
-        return replace(line, amount=amount, is_handled=True)
+        parsed = parse_amount(amount)
+        if parsed is None:
+            return replace(line, is_handled=False)
+        return replace(line, amount=parsed, is_handled=True)
     if choice is HandleChoice.ASSIGN_CATEGORY:
         return replace(line, category_id=category_id, is_handled=True)
     if choice is HandleChoice.CONFIRM_UNCATEGORIZED:
@@ -74,10 +93,14 @@ def apply_handle(
 
 
 def can_save(lines: list[DraftLine], *, default_currency: str) -> bool:
-    return all(
-        line.is_handled or not is_suspect(line, default_currency=default_currency)
-        for line in lines
-    )
+    for line in lines:
+        if line.is_excluded:
+            continue
+        if line.amount is None:
+            return False
+        if is_suspect(line, default_currency=default_currency) and not line.is_handled:
+            return False
+    return True
 
 
 def default_currency_totals(
@@ -85,10 +108,13 @@ def default_currency_totals(
 ) -> dict[str | None, str]:
     totals: dict[str | None, Decimal] = {}
     for line in lines:
-        if line.is_excluded or line.currency != default_currency or line.amount is None:
+        if line.is_excluded or line.currency != default_currency:
+            continue
+        parsed = parse_amount(line.amount)
+        if parsed is None:
             continue
         totals[line.category_id] = totals.get(line.category_id, Decimal("0")) + Decimal(
-            line.amount
+            parsed
         )
     return {category_id: f"{total:.2f}" for category_id, total in totals.items()}
 

@@ -5,7 +5,9 @@ description = "On-demand Telegram monthly spend close"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.14",
+    "python-telegram-bot>=21.0",
     "sqlalchemy>=2.0",
+    "telethon>=1.36",
 ]
 
 [build-system]

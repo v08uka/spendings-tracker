@@ -51,8 +51,10 @@ def test_round_trips_settings_and_frozen_categories(store: SqlitePersistence) ->
 
 def test_refuses_a_second_settings_row(store: SqlitePersistence) -> None:
     store.save_first_run("10001", "EUR", ["Groceries"])
-    with pytest.raises(AppError, match="settings.already_exists"):
+    with pytest.raises(AppError) as err:
         store.save_first_run("10002", "USD", ["Other"])
+    assert err.value.code == "settings.already_exists"
+    assert err.value.message == "Settings already exist."
 
 
 def test_shop_mapping_upserts_by_key_and_matches_after_trim_and_case(

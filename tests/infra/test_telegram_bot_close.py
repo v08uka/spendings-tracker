@@ -11,6 +11,7 @@ from spendings_tracker.ports.persistence import (
     ShopMapping,
     StoredDraft,
     StoredDraftLine,
+    StoredEgressLine,
     StoredMonthlyClose,
 )
 
@@ -93,7 +94,16 @@ class FakePersistence:
             )
             for index, line in enumerate(lines)
         )
-        self.draft = StoredDraft("d1", utc_month, stored, ())
+        egress = tuple(
+            StoredEgressLine(
+                id=f"e{index}",
+                line_text=text,
+                draft_id="d1",
+                monthly_close_id=None,
+            )
+            for index, text in enumerate(egress_texts)
+        )
+        self.draft = StoredDraft("d1", utc_month, stored, egress)
         return self.draft
 
     def load_draft(self):
@@ -145,6 +155,10 @@ def test_close_success_and_harvest_errors_map_to_screens() -> None:
     assert success is not None
     assert success.screen == "SCR-04"
     assert "Private draft" in success.text
+    assert "2026-08" in success.text
+    assert "Test Shop" in success.text
+    assert "12.00" in success.text
+    assert "Egress" in success.text
     assert bot.handle_group("10001", "group-1", "draft totals") is None
 
     missing = _ready_bot(
@@ -199,3 +213,144 @@ def test_save_success_and_refusals() -> None:
     assert saved is not None
     assert saved.screen == "SCR-06"
     assert "saved" in saved.text.lower()
+    assert "totals" in saved.text.lower() or "EUR" in saved.text
+
+
+def test_close_renders_empty_draft_copy_and_save_accepts_empty_totals() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(store, FakeHarvest([FamilyGroupMessage("1", "lol dinner jokes")]))
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    assert draft.screen == "SCR-04"
+    assert "No spend-looking lines" in draft.text
+    assert "empty" in draft.text.lower()
+    saved = bot.handle_private("10001", "dm-1", "/save")
+    assert saved is not None
+    assert saved.screen == "SCR-06"
+    assert "saved" in saved.text.lower()
+
+
+def test_save_same_month_twice_shows_replaced_note() -> None:
+    store = FakePersistence()
+    harvest = FakeHarvest([FamilyGroupMessage("1", "lol dinner jokes")])
+    bot = _ready_bot(store, harvest)
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    first = bot.handle_private("10001", "dm-1", "/save")
+    assert first is not None
+    assert first.screen == "SCR-06"
+    assert "replaced" not in first.text.lower()
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    second = bot.handle_private("10001", "dm-1", "/save")
+    assert second is not None
+    assert second.screen == "SCR-06"
+    assert "replaced" in second.text.lower()
+
+
+def test_second_close_while_draft_exists_is_busy_on_scr04() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    busy = bot.handle_private("10001", "dm-1", "/close 2026-07")
+    assert busy is not None
+    assert busy.screen == "SCR-04"
+    assert busy.code == "harvest.draft_in_progress"
+    assert "Finish or replace the in-progress close first" in busy.text
+
+
+def test_egress_blocked_stays_on_ready() -> None:
+    bot = _ready_bot(
+        FakePersistence(),
+        FakeHarvest(
+            error=AppError(
+                "harvest.egress_blocked",
+                "Only spend-looking lines may leave the machine.",
+            )
+        ),
+    )
+    reply = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert reply is not None
+    assert reply.screen == "SCR-02"
+    assert reply.code == "harvest.egress_blocked"
+    assert "Only spend-looking lines may leave the machine" in reply.text
+
+
+def test_resume_on_start_shows_in_progress_draft_not_ready() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    bot.handle_private("10001", "dm-1", "handle l0 exclude")
+    resumed = bot.handle_private("10001", "dm-1", "/start")
+    assert resumed is not None
+    assert resumed.screen == "SCR-04"
+    assert "Private draft" in resumed.text
+    assert "Test Shop" in resumed.text
+    assert store.draft is not None
+    assert store.draft.lines[0].is_handled is True
+
+
+def test_pick_suspect_builds_scr05_then_returns_updated_draft() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    picked = bot.handle_private("10001", "dm-1", "handle l0")
+    assert picked is not None
+    assert picked.screen == "SCR-05"
+    assert "Test Shop" in picked.text
+    lowered = picked.text.lower()
+    assert "enter amount" in lowered
+    assert "assign category" in lowered
+    assert "confirm uncategorized" in lowered
+    assert "leave other currency" in lowered
+    assert "exclude" in lowered
+    missing = bot.handle_private("10001", "dm-1", "handle l0 enter_amount")
+    assert missing is not None
+    assert missing.screen == "SCR-05"
+    assert "Amount is required" in missing.text
+    handled = bot.handle_private("10001", "dm-1", "handle l0 exclude")
+    assert handled is not None
+    assert handled.screen == "SCR-04"
+    assert "Private draft" in handled.text
+
+
+def test_malformed_close_and_unknown_handle_are_app_errors() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    bare = bot.handle_private("10001", "dm-1", "/close")
+    assert bare is not None
+    assert bare.code is not None
+    assert bare.text != bare.code
+    bad_month = bot.handle_private("10001", "dm-1", "/close not-a-month")
+    assert bad_month is not None
+    assert bad_month.code is not None
+    assert bad_month.text != bad_month.code
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    unknown = bot.handle_private("10001", "dm-1", "handle l0 not_a_choice")
+    assert unknown is not None
+    assert unknown.code == "handle.unknown_choice"
+    assert unknown.screen == "SCR-05"
+    assert unknown.text != unknown.code
+
+
+def test_non_closer_handle_and_save_are_auth_errors() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    bot.handle_private("10001", "dm-1", "/close 2026-08")
+    handle = bot.handle_private("10002", "dm-2", "handle l0 exclude")
+    save = bot.handle_private("10002", "dm-2", "/save")
+    assert handle is not None
+    assert handle.code == "auth.not_closer"
+    assert handle.screen == "SCR-07"
+    assert "draft" not in handle.text.lower()
+    assert save is not None
+    assert save.code == "auth.not_closer"
+    assert "draft" not in save.text.lower()

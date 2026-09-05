@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from spendings_tracker.app.errors import AppError
+from spendings_tracker.app.errors import catalog_error
 from spendings_tracker.domain.draft import (
     can_save,
     default_currency_totals,
@@ -23,10 +23,10 @@ class SaveResult:
 def save_monthly_close(persistence: PersistencePort) -> SaveResult:
     settings = persistence.load_settings()
     if settings is None:
-        raise AppError("save.no_draft", "There is no draft to save.")
+        raise catalog_error("save.no_draft")
     draft = persistence.load_draft()
     if draft is None:
-        raise AppError("save.no_draft", "There is no draft to save.")
+        raise catalog_error("save.no_draft")
     domain_lines = [
         make_draft_line(
             amount=line.amount,
@@ -38,10 +38,7 @@ def save_monthly_close(persistence: PersistencePort) -> SaveResult:
         for line in draft.lines
     ]
     if not can_save(domain_lines, default_currency=settings.default_currency):
-        raise AppError(
-            "save.unhandled_suspect",
-            "Every suspect line must be handled before save.",
-        )
+        raise catalog_error("save.unhandled_suspect")
     existing = persistence.load_monthly_close(draft.utc_month)
     close = persistence.save_monthly_close(
         default_currency=settings.default_currency

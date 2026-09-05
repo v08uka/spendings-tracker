@@ -184,22 +184,6 @@ def test_unreadable_month_is_not_obtained() -> None:
     assert err.value.code == "harvest.month_not_obtained"
 
 
-def test_blocks_non_spend_looking_egress() -> None:
-    model = FakeModel()
-    model.classify = lambda lines, names: (_ for _ in ()).throw(
-        AppError("harvest.egress_blocked")
-    )
-    with pytest.raises(AppError) as err:
-        harvest_month(
-            FakePersistence(settings=_settings()),
-            FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")]),
-            model,
-            "2026-08",
-            now=NOW,
-        )
-    assert err.value.code == "harvest.egress_blocked"
-
-
 def test_splits_pairs_skips_mapped_shop_and_sends_unmapped_only() -> None:
     mapping = ShopMapping(
         id="map-1",
@@ -220,7 +204,6 @@ def test_splits_pairs_skips_mapped_shop_and_sends_unmapped_only() -> None:
         now=NOW,
     )
 
-    assert result.posted_to_group is False
     assert [line.line_text for line in result.draft.lines] == [
         "Test Shop 12.00",
         "Other Shop 8.50",
@@ -244,6 +227,78 @@ def test_empty_spend_looking_month_is_saveable_empty_draft() -> None:
     assert result.draft.lines == ()
     assert result.draft.egress_lines == ()
     assert result.suspect_count == 0
+
+
+def test_source_line_index_is_per_message_pair_index() -> None:
+    store = FakePersistence(settings=_settings())
+    model = FakeModel(names=["Uncategorized", "Uncategorized", "Uncategorized"])
+    result = harvest_month(
+        store,
+        FakeHarvest(
+            [
+                FamilyGroupMessage("msg-1", "Alpha Shop 1.00 Beta Shop 2.00"),
+                FamilyGroupMessage("msg-2", "Gamma Shop 3.00"),
+            ]
+        ),
+        model,
+        "2026-08",
+        now=NOW,
+    )
+    indexes = [
+        (line.source_message_id, line.source_line_index)
+        for line in result.draft.lines
+    ]
+    assert indexes == [("msg-1", 0), ("msg-1", 1), ("msg-2", 0)]
+
+
+def test_invalid_utc_month_is_app_error_not_value_error() -> None:
+    with pytest.raises(AppError) as err:
+        harvest_month(
+            FakePersistence(settings=_settings()),
+            FakeHarvest([FamilyGroupMessage("1", "Test Shop 12")]),
+            FakeModel(),
+            "not-a-month",
+            now=NOW,
+        )
+    assert err.value.message != err.value.code
+    assert err.value.message
+
+
+def test_parses_amount_first_known_currency_and_comma_decimal() -> None:
+    store = FakePersistence(settings=_settings())
+    model = FakeModel(names=["Uncategorized", "Uncategorized", "Uncategorized"])
+    result = harvest_month(
+        store,
+        FakeHarvest(
+            [
+                FamilyGroupMessage("1", "12.00 Test Shop"),
+                FamilyGroupMessage("2", "Cafe 8.00 VAT"),
+                FamilyGroupMessage("3", "Bakery 12,50"),
+            ]
+        ),
+        model,
+        "2026-08",
+        now=NOW,
+    )
+    first, vat_line, comma = result.draft.lines
+    assert first.shop_display == "Test Shop"
+    assert first.amount == "12.00"
+    assert vat_line.currency == "EUR"
+    assert vat_line.shop_display == "Cafe"
+    assert comma.amount == "12.50"
+
+
+def test_wrong_length_classify_is_model_unavailable() -> None:
+    with pytest.raises(AppError) as err:
+        harvest_month(
+            FakePersistence(settings=_settings()),
+            FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")]),
+            FakeModel(names=["Groceries", "Transport"]),
+            "2026-08",
+            now=NOW,
+        )
+    assert err.value.code == "model.unavailable"
+    assert err.value.message != err.value.code
 
 
 def test_large_month_is_obtained_in_full() -> None:

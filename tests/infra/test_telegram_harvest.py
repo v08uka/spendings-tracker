@@ -56,8 +56,10 @@ def test_unreadable_month_becomes_month_not_obtained() -> None:
         session_path=Path("/data/telegram.session"),
     )
 
-    with pytest.raises(AppError, match="harvest.month_not_obtained"):
+    with pytest.raises(AppError) as err:
         harvest.harvest_month("2026-08")
+    assert err.value.code == "harvest.month_not_obtained"
+    assert err.value.message == "That month could not be obtained."
 
 
 def test_month_with_no_family_group_messages_is_not_obtained() -> None:
@@ -66,5 +68,7 @@ def test_month_with_no_family_group_messages_is_not_obtained() -> None:
         session_path=Path("/data/telegram.session"),
     )
 
-    with pytest.raises(AppError, match="harvest.month_not_obtained"):
+    with pytest.raises(AppError) as err:
         harvest.harvest_month("2026-08")
+    assert err.value.code == "harvest.month_not_obtained"
+    assert err.value.message == "That month could not be obtained."

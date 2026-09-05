@@ -70,6 +70,31 @@ def test_save_requires_every_remaining_suspect_handled() -> None:
     assert can_save([], default_currency=EUR) is True
 
 
+def test_enter_amount_without_parseable_amount_does_not_set_handled() -> None:
+    missing = make_draft_line(amount=None, currency=EUR, category_id=GROCERIES)
+
+    for raw in (None, "", "abc"):
+        result = apply_handle(missing, HandleChoice.ENTER_AMOUNT, amount=raw)
+        assert result.is_handled is False
+        assert result.amount is None
+
+
+def test_can_save_rejects_handled_line_still_missing_amount() -> None:
+    falsely_handled = make_draft_line(
+        amount=None,
+        currency=EUR,
+        category_id=GROCERIES,
+        is_handled=True,
+    )
+    assert can_save([falsely_handled], default_currency=EUR) is False
+
+
+def test_totals_normalise_comma_decimals() -> None:
+    line = make_draft_line(amount="12,50", currency=EUR, category_id=GROCERIES)
+    totals = default_currency_totals([line], default_currency=EUR)
+    assert totals == {GROCERIES: "12.50"}
+
+
 def test_totals_omit_excluded_and_other_currency_lines() -> None:
     groceries = make_draft_line(amount="12.00", currency=EUR, category_id=GROCERIES)
     extra = make_draft_line(amount="3.00", currency=EUR, category_id=GROCERIES)

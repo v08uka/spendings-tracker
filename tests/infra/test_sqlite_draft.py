@@ -74,8 +74,10 @@ def test_round_trips_one_draft_with_several_lines_after_reconnect(
 def test_refuses_a_second_draft(db_path: Path) -> None:
     store, _ = _store(db_path)
     store.create_draft("2026-08", [], [])
-    with pytest.raises(AppError, match="harvest.draft_in_progress"):
+    with pytest.raises(AppError) as err:
         store.create_draft("2026-07", [], [])
+    assert err.value.code == "harvest.draft_in_progress"
+    assert err.value.message == "Finish or replace the in-progress close first."
 
 
 def test_save_replaces_close_for_same_month_and_copies_egress(db_path: Path) -> None:

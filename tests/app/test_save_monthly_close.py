@@ -162,6 +162,14 @@ def test_refuses_no_draft_and_unhandled_suspect() -> None:
     assert unhandled.value.code == "save.unhandled_suspect"
 
 
+def test_save_of_empty_draft_accepts_empty_totals() -> None:
+    store = FakePersistence(StoredDraft("d1", "2026-08", (), ()))
+    result = save_monthly_close(store)
+    assert result.replaced is False
+    assert result.totals == {}
+    assert result.close.lines == ()
+
+
 def test_second_save_for_same_month_is_replaced() -> None:
     store = FakePersistence(
         StoredDraft("d1", "2026-08", (_line("a", "12.00"),), ())

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from spendings_tracker.app.errors import AppError
+from spendings_tracker.app.errors import catalog_error
 from spendings_tracker.domain.categories import confirmable_names
 from spendings_tracker.ports.persistence import PersistencePort, Settings
 
@@ -20,10 +20,7 @@ def complete_first_run(
 ) -> Settings:
     names = confirmable_names(category_names)
     if not names:
-        raise AppError(
-            EMPTY_LIST,
-            "At least one category is required. Uncategorized does not count.",
-        )
+        raise catalog_error(EMPTY_LIST)
     currency = default_currency.strip() or DEFAULT_CURRENCY
     return persistence.save_first_run(closer_identity, currency, names)
 
@@ -31,5 +28,5 @@ def complete_first_run(
 def require_first_run(persistence: PersistencePort) -> Settings:
     settings = persistence.load_settings()
     if settings is None:
-        raise AppError(STILL_REQUIRED, "First-run setup is still required.")
+        raise catalog_error(STILL_REQUIRED)
     return settings

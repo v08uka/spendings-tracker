@@ -5,6 +5,10 @@ services:
       SPENDINGS_DB_PATH: /data/spendings.sqlite
       TELEGRAM_SESSION_PATH: /data/telegram.session
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_FAMILY_GROUP: ${TELEGRAM_FAMILY_GROUP:-}
+      MODEL_VENDOR: ${MODEL_VENDOR:-uncategorized}
     volumes:
       - spendings-state:/data
 

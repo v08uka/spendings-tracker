@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
-from spendings_tracker.app.errors import AppError
+from spendings_tracker.app.errors import catalog_error
 from spendings_tracker.domain.shop import shop_key
 from spendings_tracker.infra.ulid import new_ulid
 from spendings_tracker.ports.persistence import (
@@ -36,6 +38,18 @@ class SqlitePersistence:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    @contextmanager
+    def _db(self) -> Iterator[sqlite3.Connection]:
+        conn = self._connect()
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def save_first_run(
         self,
         closer_identity: str,
@@ -44,38 +58,41 @@ class SqlitePersistence:
     ) -> Settings:
         created_at = _now()
         settings_id = new_ulid()
-        with self._connect() as conn:
+        with self._db() as conn:
             existing = conn.execute("SELECT id FROM settings LIMIT 1").fetchone()
             if existing is not None:
-                raise AppError("settings.already_exists")
-            conn.execute(
-                "INSERT INTO settings"
-                " (id, closer_identity, default_currency, created_at)"
-                " VALUES (?, ?, ?, ?)",
-                (settings_id, closer_identity, default_currency, created_at),
-            )
+                raise catalog_error("settings.already_exists")
             categories: list[Category] = []
-            for sort_order, name in enumerate(category_names):
-                category = Category(
-                    id=new_ulid(),
-                    settings_id=settings_id,
-                    name=name,
-                    sort_order=sort_order,
-                    created_at=created_at,
-                )
+            try:
                 conn.execute(
-                    "INSERT INTO categories"
-                    " (id, settings_id, name, sort_order, created_at)"
-                    " VALUES (?, ?, ?, ?, ?)",
-                    (
-                        category.id,
-                        category.settings_id,
-                        category.name,
-                        category.sort_order,
-                        category.created_at,
-                    ),
+                    "INSERT INTO settings"
+                    " (id, closer_identity, default_currency, created_at)"
+                    " VALUES (?, ?, ?, ?)",
+                    (settings_id, closer_identity, default_currency, created_at),
                 )
-                categories.append(category)
+                for sort_order, name in enumerate(category_names):
+                    category = Category(
+                        id=new_ulid(),
+                        settings_id=settings_id,
+                        name=name,
+                        sort_order=sort_order,
+                        created_at=created_at,
+                    )
+                    conn.execute(
+                        "INSERT INTO categories"
+                        " (id, settings_id, name, sort_order, created_at)"
+                        " VALUES (?, ?, ?, ?, ?)",
+                        (
+                            category.id,
+                            category.settings_id,
+                            category.name,
+                            category.sort_order,
+                            category.created_at,
+                        ),
+                    )
+                    categories.append(category)
+            except sqlite3.IntegrityError as exc:
+                raise catalog_error("first_run.empty_category_list") from exc
         return Settings(
             id=settings_id,
             closer_identity=closer_identity,
@@ -85,7 +102,7 @@ class SqlitePersistence:
         )
 
     def load_settings(self) -> Settings | None:
-        with self._connect() as conn:
+        with self._db() as conn:
             row = conn.execute(
                 "SELECT id, closer_identity, default_currency, created_at FROM settings"
                 " LIMIT 1"
@@ -121,7 +138,7 @@ class SqlitePersistence:
         key = shop_key(shop_display)
         display = shop_display.strip()
         created_at = _now()
-        with self._connect() as conn:
+        with self._db() as conn:
             existing = conn.execute(
                 "SELECT id, shop_key, shop_display, category_id, created_at"
                 " FROM shop_mappings WHERE shop_key = ?",
@@ -163,7 +180,7 @@ class SqlitePersistence:
 
     def find_shop_mapping(self, shop_display: str) -> ShopMapping | None:
         key = shop_key(shop_display)
-        with self._connect() as conn:
+        with self._db() as conn:
             row = conn.execute(
                 "SELECT id, shop_key, shop_display, category_id, created_at"
                 " FROM shop_mappings WHERE shop_key = ?",
@@ -180,7 +197,7 @@ class SqlitePersistence:
         )
 
     def list_shop_mappings(self) -> tuple[ShopMapping, ...]:
-        with self._connect() as conn:
+        with self._db() as conn:
             rows = conn.execute(
                 "SELECT id, shop_key, shop_display, category_id, created_at"
                 " FROM shop_mappings ORDER BY shop_key"
@@ -204,9 +221,9 @@ class SqlitePersistence:
     ) -> StoredDraft:
         created_at = _now()
         draft_id = new_ulid()
-        with self._connect() as conn:
+        with self._db() as conn:
             if conn.execute("SELECT id FROM drafts LIMIT 1").fetchone() is not None:
-                raise AppError("harvest.draft_in_progress")
+                raise catalog_error("harvest.draft_in_progress")
             conn.execute(
                 "INSERT INTO drafts (id, utc_month, created_at) VALUES (?, ?, ?)",
                 (draft_id, utc_month, created_at),
@@ -272,7 +289,7 @@ class SqlitePersistence:
         )
 
     def load_draft(self) -> StoredDraft | None:
-        with self._connect() as conn:
+        with self._db() as conn:
             draft = conn.execute(
                 "SELECT id, utc_month FROM drafts LIMIT 1"
             ).fetchone()
@@ -298,7 +315,7 @@ class SqlitePersistence:
         )
 
     def update_draft_line(self, line: StoredDraftLine) -> StoredDraftLine:
-        with self._connect() as conn:
+        with self._db() as conn:
             conn.execute(
                 "UPDATE draft_lines SET amount = ?, currency = ?, category_id = ?,"
                 " is_excluded = ?, is_handled = ? WHERE id = ?",
@@ -316,10 +333,10 @@ class SqlitePersistence:
     def save_monthly_close(self, *, default_currency: str) -> StoredMonthlyClose:
         draft = self.load_draft()
         if draft is None:
-            raise AppError("save.no_draft")
+            raise catalog_error("save.no_draft")
         created_at = _now()
         close_id = new_ulid()
-        with self._connect() as conn:
+        with self._db() as conn:
             existing = conn.execute(
                 "SELECT id FROM monthly_closes WHERE utc_month = ?",
                 (draft.utc_month,),
@@ -395,7 +412,7 @@ class SqlitePersistence:
         )
 
     def load_monthly_close(self, utc_month: str) -> StoredMonthlyClose | None:
-        with self._connect() as conn:
+        with self._db() as conn:
             close = conn.execute(
                 "SELECT id, utc_month, default_currency FROM monthly_closes"
                 " WHERE utc_month = ?",
@@ -437,7 +454,7 @@ class SqlitePersistence:
         )
 
     def load_latest_monthly_close(self) -> StoredMonthlyClose | None:
-        with self._connect() as conn:
+        with self._db() as conn:
             row = conn.execute(
                 "SELECT utc_month FROM monthly_closes ORDER BY utc_month DESC LIMIT 1"
             ).fetchone()

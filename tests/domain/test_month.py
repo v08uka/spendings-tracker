@@ -16,3 +16,9 @@ def test_accepts_a_completed_utc_month() -> None:
 
 def test_refuses_a_future_utc_month() -> None:
     assert is_completed_utc_month("2026-10", now=NOW) is False
+
+
+def test_invalid_month_does_not_raise_value_error() -> None:
+    assert is_completed_utc_month("not-a-month", now=NOW) is False
+    assert is_completed_utc_month("2026-13", now=NOW) is False
+    assert is_completed_utc_month("", now=NOW) is False

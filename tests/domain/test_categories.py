@@ -14,3 +14,13 @@ def test_uncategorized_does_not_count() -> None:
 def test_keeps_at_least_one_confirmed_name() -> None:
     assert confirmable_names(["Groceries"]) == ["Groceries"]
     assert confirmable_names(["Uncategorized", "Groceries"]) == ["Groceries"]
+
+
+def test_dedupes_confirmed_names_case_insensitively() -> None:
+    assert confirmable_names(["Groceries", "groceries", "GROCERIES"]) == [
+        "Groceries"
+    ]
+    assert confirmable_names(["Transport", "transport", "Groceries"]) == [
+        "Transport",
+        "Groceries",
+    ]

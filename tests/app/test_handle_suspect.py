@@ -148,6 +148,47 @@ def test_assign_category_upserts_map_but_not_other_spelling() -> None:
     assert store.find_shop_mapping("Lidl Express") is None
 
 
+def test_assign_category_rejects_id_not_on_frozen_list() -> None:
+    lidl = _line("l1", "Lidl", amount="12.00")
+    store = FakePersistence(
+        settings=SETTINGS,
+        draft=StoredDraft("d1", "2026-08", (lidl,), ()),
+    )
+    with pytest.raises(AppError) as err:
+        handle_suspect(
+            store,
+            closer_identity="10001",
+            draft_line_id="l1",
+            choice=HandleChoice.ASSIGN_CATEGORY,
+            category_id="bogus-id",
+        )
+    assert err.value.code == "handle.unknown_category"
+    assert err.value.message != err.value.code
+    assert store.mappings == {}
+    assert store.draft is not None
+    assert store.draft.lines[0].category_id is None
+    assert store.draft.lines[0].is_handled is False
+
+
+def test_enter_amount_without_amount_is_app_error() -> None:
+    missing = _line("l1", "Test Shop", amount=None, category_id="cat-g")
+    store = FakePersistence(
+        settings=SETTINGS,
+        draft=StoredDraft("d1", "2026-08", (missing,), ()),
+    )
+    with pytest.raises(AppError) as err:
+        handle_suspect(
+            store,
+            closer_identity="10001",
+            draft_line_id="l1",
+            choice=HandleChoice.ENTER_AMOUNT,
+            amount=None,
+        )
+    assert err.value.message != err.value.code
+    assert store.draft is not None
+    assert store.draft.lines[0].is_handled is False
+
+
 def test_missing_draft_or_line_returns_contract_codes() -> None:
     empty = FakePersistence(settings=SETTINGS, draft=None)
     with pytest.raises(AppError) as no_draft:

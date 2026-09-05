@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from spendings_tracker.app.errors import AppError
-from spendings_tracker.domain.draft import HandleChoice, apply_handle, make_draft_line
+from spendings_tracker.app.errors import catalog_error
+from spendings_tracker.domain.draft import (
+    HandleChoice,
+    apply_handle,
+    make_draft_line,
+    parse_amount,
+)
 from spendings_tracker.ports.persistence import PersistencePort, StoredDraft
 
 
@@ -20,18 +25,21 @@ def handle_suspect(
 ) -> StoredDraft:
     settings = persistence.load_settings()
     if settings is None:
-        raise AppError("save.no_draft", "There is no draft to save.")
+        raise catalog_error("save.no_draft")
     if closer_identity != settings.closer_identity:
-        raise AppError("auth.not_closer", "You cannot use this bot.")
+        raise catalog_error("auth.not_closer")
     draft = persistence.load_draft()
     if draft is None:
-        raise AppError("save.no_draft", "There is no draft to save.")
+        raise catalog_error("save.no_draft")
     found = next((line for line in draft.lines if line.id == draft_line_id), None)
     if found is None:
-        raise AppError(
-            "draft.line_not_found",
-            "That line is not on the in-progress draft.",
-        )
+        raise catalog_error("draft.line_not_found")
+    if choice is HandleChoice.ENTER_AMOUNT and parse_amount(amount) is None:
+        raise catalog_error("handle.invalid_amount")
+    if choice is HandleChoice.ASSIGN_CATEGORY:
+        known = {category.id for category in settings.categories}
+        if category_id is None or category_id not in known:
+            raise catalog_error("handle.unknown_category")
     handled = apply_handle(
         make_draft_line(
             amount=found.amount,
@@ -57,5 +65,5 @@ def handle_suspect(
         persistence.upsert_shop_mapping(found.shop_display, category_id)
     updated = persistence.load_draft()
     if updated is None:
-        raise AppError("save.no_draft", "There is no draft to save.")
+        raise catalog_error("save.no_draft")
     return updated

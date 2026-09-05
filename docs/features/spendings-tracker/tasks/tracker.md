@@ -25,3 +25,12 @@
 | T18 | Wire the process and prove the quality goals | wiring | Dell | M | T15, T17, T9, T10 | done |
 
 **Total:** 18 tasks, ~16 person-days.
+
+## Review follow-up — 2026-09-05
+
+| # | Cluster | Status |
+|---|---|---|
+| R1 | Handle invariants, parse, contracts (S1-05, S1-08–S1-10, S2-01–S2-03) | done |
+| R2 | Closer-visible bot UI (S1-02–S1-04, S1-06, S1-07) | done |
+| R3 | Hygiene + tests (S2-04, S2-05) | done |
+| R4 | Runnable process / long-poll (S1-01) | done |

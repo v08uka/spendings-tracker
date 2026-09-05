@@ -5,6 +5,16 @@ from spendings_tracker.infra.telegram_bot import TelegramBot
 from spendings_tracker.ports.persistence import Category, Settings, ShopMapping
 
 
+class StubHarvest:
+    def harvest_month(self, utc_month: str):
+        raise AssertionError("harvest must not run during first-run")
+
+
+class StubModel:
+    def classify(self, lines, category_names):
+        raise AssertionError("model must not run during first-run")
+
+
 class FakePersistence:
     def __init__(self) -> None:
         self.settings: Settings | None = None
@@ -63,21 +73,51 @@ class FakePersistence:
     def load_monthly_close(self, utc_month: str):
         return None
 
+    def load_latest_monthly_close(self):
+        return None
+
+
+def _bot(store: FakePersistence | None = None) -> TelegramBot:
+    return TelegramBot(store or FakePersistence(), StubHarvest(), StubModel())
+
 
 def test_first_run_confirm_reaches_ready() -> None:
-    bot = TelegramBot(FakePersistence())
+    bot = _bot()
     start = bot.handle_private("10001", "dm-1", "/start")
     confirm = bot.handle_private("10001", "dm-1", "confirm Groceries, Transport")
 
     assert start is not None
     assert start.screen == "SCR-01"
+    assert "Keep EUR" in start.text
+    assert "Change" in start.text
     assert confirm is not None
     assert confirm.screen == "SCR-02"
     assert "Monthly closes can start" in confirm.text
+    assert "EUR" in confirm.text
+
+
+def test_first_run_can_choose_a_currency_other_than_eur() -> None:
+    store = FakePersistence()
+    bot = _bot(store)
+    start = bot.handle_private("10001", "dm-1", "/start")
+    change = bot.handle_private("10001", "dm-1", "change USD")
+    confirm = bot.handle_private("10001", "dm-1", "confirm Groceries")
+
+    assert start is not None
+    assert "Keep EUR" in start.text
+    assert change is not None
+    assert change.screen == "SCR-01"
+    assert "USD" in change.text
+    assert confirm is not None
+    assert confirm.screen == "SCR-02"
+    assert store.settings is not None
+    assert store.settings.default_currency == "USD"
+    assert "USD" in confirm.text
+    assert "Default currency: EUR" not in confirm.text
 
 
 def test_empty_list_and_close_before_confirm_are_contract_errors() -> None:
-    bot = TelegramBot(FakePersistence())
+    bot = _bot()
     bot.handle_private("10001", "dm-1", "/start")
     empty = bot.handle_private("10001", "dm-1", "confirm")
     close = bot.handle_private("10001", "dm-1", "/close 2026-08")
@@ -92,7 +132,7 @@ def test_empty_list_and_close_before_confirm_are_contract_errors() -> None:
 
 def test_non_closer_gets_auth_error_without_draft_or_close_detail() -> None:
     store = FakePersistence()
-    bot = TelegramBot(store)
+    bot = _bot(store)
     bot.handle_private("10001", "dm-1", "/start")
     bot.handle_private("10001", "dm-1", "confirm Groceries")
 
