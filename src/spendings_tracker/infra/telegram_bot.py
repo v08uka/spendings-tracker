@@ -90,6 +90,11 @@ class TelegramBot:
                 code="auth.not_closer",
             )
         stripped = text.strip()
+        if stripped.startswith("/start"):
+            self._clear_follow_ups(user_id)
+            if settings is None:
+                return self._first_run(user_id, chat_id, stripped)
+            return self._resume_or_ready(chat_id, settings)
         if stripped.startswith("/close"):
             return self._close(user_id, chat_id, stripped)
         if stripped.startswith("/save"):
@@ -163,6 +168,7 @@ class TelegramBot:
             return BotReply(
                 chat_id=chat_id, text=err.message, screen="SCR-05", code=err.code
             )
+        self._clear_follow_ups(user_id)
         self._pending_line[user_id] = found.id
         return self._scr05(chat_id, found.id)
 

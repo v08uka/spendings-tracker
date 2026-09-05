@@ -61,4 +61,4 @@
 | R9 | Harvest date window (S1-01) | done |
 | R10 | SCR-01 published tokens (S1-02) | done |
 | R11 | Ignore session secrets (S2-02) | done |
-| R12 | Clear leftover follow-ups on /start and re-pick (S2-03) | todo |
+| R12 | Clear leftover follow-ups on /start and re-pick (S2-03) | done |
