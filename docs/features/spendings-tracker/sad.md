@@ -9,10 +9,6 @@ target_surfaces: [backend-service]
 
 # Software Architecture Document — spendings-tracker
 
-<!-- 12 Arc42 sections. Empty section → <!-- N/A: <one-line reason> -->. -->
-<!-- C4 Context (L1) lives inline in §3. C4 Container (L2) lives inline in §5. -->
-<!-- Numbers in §10 come VERBATIM from spec.md §6 NFR — no inventing, no rounding. -->
-
 ## 1. Introduction and goals
 
 **Intent.** The closer — the only operator of a monthly close — starts this tool on demand, harvests a completed UTC month’s already-existing family-group messages without an export file, and turns spend-looking lines into a private draft they can audit and save. Family posters keep writing shop-and-amount mentions as usual and never become operators. Only spend-looking lines may leave the machine for a language-model service; settings, the shop-to-category map, saved monthly closes, and an in-progress draft survive a stop.
@@ -305,32 +301,41 @@ Each top-3 goal from §1 expanded into a full scenario. Numbers from spec §6 NF
 
 ## 11. Risks and technical debt
 
-<!-- 🎯 Why: ⭐ collects EVERYTHING that can break — not only the technical. Without §11 risks get
-     discussed at standups and lost; debt lives only in the head of whoever accepted it.
-     📋 Write: a risk/debt table — severity — mitigation — owner. Accepted debt in its own block.
-     📌 The first risk is often a product risk, not a technical one. That's normal. -->
-
-<!-- Severity literals: Low / Medium / High for regular risks; "Open question" for rows created by
-     a Save-as-OQ resolution during the Socratic walk (see references/socratic.md). -->
-
 | Risk / debt | Severity | Mitigation | Owner |
 |---|---|---|---|
-| <e.g. Worker lag may reach hours during a downstream outage> | Medium | <alert >10 min, on-call playbook, retry backoff> | <DevOps> |
-| <e.g. No event-schema versioning in v1> | Medium | <ADR-NNNN planned for v2, tolerate unknown fields> | <Backend> |
-| Open architectural decision: <decision-headline> | Open question | Resolve before <stage trigger or YYYY-MM-DD>; <inline rationale from the Save-as-OQ> | <owner> |
+| Cold-start harvest fails (user session missing, Telegram blocks the client, or group history unreadable) | High | Prove harvest on a real completed month before other use cases; treat session login as first-run work | Dell |
+| User session on the data volume can impersonate the closer | High | Volume permissions + disk encryption; required security review (spec §6.1, ADR-0007) | Security Lead |
+| A clean line is still wrong because the closer does not inspect every clean line | Medium | Accepted residual (spec §6.1); do not claim bank-grade completeness; save is acceptance | closer |
+| Stop during the synchronous harvest wait loses unfinished work | Medium | Closer asks again; no mid-harvest draft until persist (ADR-0004) | closer |
+| Stale shop map keeps filing a shop until the closer overrides | Medium | Override updates the map (ADR-0005) | closer |
+| Language-model service down or slow blows the 180-second budget | Medium | Translate to `AppError`; closer retries; tests use a fake `ModelPort` | Dell |
+| Two writers on the same SQLite file | Low | One Compose service; do not scale out (repo ADR-0003) | Dell |
+| Scaffold is empty (no Telegram library, no ULID helper, `__main__` boots and exits, schema is empty `0001`) | Medium | First feature fills ports, wiring, and the next Alembic revision | Dell |
+| `docs/architecture-map.md` is stale (`reflects_commit` a8f7fcc vs HEAD after scaffold) | Low | Re-run `/sdd:survey` | Dell |
 
 **Accepted debt (acceptable in v1, plan to fix later):**
-- <e.g. the entity is immutable / unversioned — OK for v1, may need audit versioning in v2>
+- Silent wrong totals from unaudited clean lines (spec §6.1)
+- First language-model vendor is unnamed; only the port is locked
+- Feature ADR count is 7 (size L typical band is 10–15); further ADRs only if implement hits a new blast-radius choice
 
 ## 12. Glossary
 
-<!-- 🎯 Why: ⭐ the DOMAIN GLOSSARY that ends arguments a year later («checkpoint — weekly or
-     biweekly? quarter — calendar or fiscal?»).
-     📋 Write: a term / meaning table. Business + technical terms mixed.
-     📌 e.g. «Lesson | a unit inside a course made of blocks (text, video)». -->
+Roles and domain terms match `docs/features/spendings-tracker/CONTEXT.md`. Terms marked *surfaced here* are not in that glossary yet — consider `/sdd:glossary spendings-tracker` if they should be canonical.
 
 | Term | Meaning |
 |---|---|
-| <e.g. domain object A> | <its meaning in this domain> |
-| <e.g. domain object B> | <its meaning> |
-| <e.g. domain invariant name> | <the rule, in plain language> |
+| closer | The only operator of a monthly close: starts the tool, asks for a month, reviews the private draft, and saves |
+| family poster | Any member of the family group who writes messages there, including the closer when they post |
+| monthly close | A saved month the closer trusts after reviewing suspect lines and accepting the category totals |
+| spend-looking line | A shop-and-amount mention taken from a family-group message that looks like a spend; one message may yield several lines; the only text that may leave the machine for a language-model service |
+| draft | The private list of a month’s spend-looking lines that only the closer sees; never posted to the family group |
+| suspect line | A draft line that is missing an amount, uses a currency other than the default currency, or is Uncategorized; the closer must handle it before saving |
+| clean line | A spend-looking line that is not a suspect line; not a promise the line is factually correct |
+| default currency | The currency the closer chooses on first run (preset EUR) |
+| shop-to-category map | Optional memory of shop → category; starts empty and grows from the closer’s corrections |
+| category | A name on the short list the closer confirmed on first run; later monthly closes must not invent new names |
+| Uncategorized | The bucket for a spend-looking line that does not fit any confirmed category; always a suspect line; not a member of the confirmed list |
+| harvest | The on-demand read of a completed UTC month’s already-existing family-group history, using the closer’s access, without an export file |
+| egress *surfaced here* | A send of spend-looking line text off the machine to a language-model service; every such line is persisted for closer review |
+| user session *surfaced here* | The closer’s Telegram login (MTProto) used to harvest group history; stored on the data volume |
+| AppError | The one application error type; adapters translate vendor and Telegram failures into it |
