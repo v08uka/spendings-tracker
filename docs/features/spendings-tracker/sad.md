@@ -15,29 +15,26 @@ target_surfaces: []
 
 ## 1. Introduction and goals
 
-<!-- 🎯 Why: durable memory of «what + the three dominant qualities + who cares». A year from
-     now nobody recalls which three qualities were critical for this system.
-     📋 Write: 1 ¶ intent + 3 lines of top-3 quality goals + a stakeholders table.
-     ¶4 is the override slot — critic `Override` resolutions emit «Decision override: <headline>
-     — rationale: <reason>» bullets here so downstream skills see the deliberate choice. -->
-
-**Intent.** <One paragraph from spec §2 Goals — what we're building and for whom.>
+**Intent.** The closer — the only operator of a monthly close — starts this tool on demand, harvests a completed UTC month’s already-existing family-group messages without an export file, and turns spend-looking lines into a private draft they can audit and save. Family posters keep writing shop-and-amount mentions as usual and never become operators. Only spend-looking lines may leave the machine for a language-model service; settings, the shop-to-category map, saved monthly closes, and an in-progress draft survive a stop.
 
 **Top-3 quality goals (1-liners; full scenarios in §10):**
 
-1. <e.g. "Availability under partial failure of a downstream module">
-2. <e.g. "Read performance for the dashboard under data-scale growth">
-3. <e.g. "Recoverability with <30 min RTO">
+1. Spend-looking-only egress — 100% of text sent off the machine for classification is spend-looking lines.
+2. Time-to-draft — ≤ 180 seconds for a month with at most 500 family-group messages; months with more than 500 messages are still harvested in full with no 180-second promise.
+3. Recoverability after an on-demand stop — settings and saved monthly closes survive; an in-progress draft survives; unplanned stop during a close fewer than 1 in 10 starts.
+
+Time-to-ready (≤ 60 seconds after start) and overlapping monthly closes (0 in-progress drafts) remain spec §6 NFRs; they do not displace the top three.
 
 **Stakeholders.**
 
 | Role | Interest | Sign-off owner? |
 |---|---|---|
-| <author role from glossary> | <feature usage> | No |
-| <consumer role from glossary> | <read usage> | No |
+| closer | Only operator: first-run, harvest, private draft, save | No |
+| family poster | Source of shop-and-amount lines; never sees the draft | No |
 | Tech Lead | SAD approval | Yes |
+| Security Lead | Required security review (spec §6.1) | Yes |
 
-<!-- Decision overrides (¶4) — populated by the critic resolution loop, empty otherwise. -->
+The confirmed category list stays frozen after first-run (ADR-0001). The closer’s egress review for a close lists every spend-looking line that left the machine (ADR-0002).
 
 ## 2. Constraints
 
