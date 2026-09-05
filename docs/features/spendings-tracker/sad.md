@@ -258,21 +258,17 @@ One Compose service `app` and one named volume `spendings-state` mounted at `/da
 
 ## 8. Crosscutting concepts
 
-<!-- 🎯 Why: CROSS-CUTTING PATTERNS spanning several modules: logging, errors, authorization, ID
-     strategy, events, caching. ⭐ The second-densest section. A pattern inside one module is NOT
-     here; a project-wide convention belongs in the convention file.
-     📋 Write: a table — concept / convention / where defined. One row per concept.
-     📌 e.g. «sortable time-based IDs generated in the app layer» as a default from the convention file. -->
-
 | Concept | Convention | Where defined |
 |---|---|---|
-| Logging | <e.g. structured, fields `module=<name>`> | <convention file §X or here> |
-| Authentication | <e.g. token-based via middleware> | <convention file §X> |
-| Error handling | <e.g. domain sentinel → ports error mapping → JSON> | <convention file §X> |
-| ID strategy | <e.g. sortable time-based ID in the app layer> | <convention file §X> |
-| Internationalisation | <e.g. N/A, single language> | — |
-| Observability | <e.g. tracing on the request boundary> | — |
-| Events | <module-specific patterns, if any> | <here> |
+| Logging | Stdlib logging in adapters; no hosted log drain | here |
+| Authentication / AuthZ | The Telegram account that finishes first-run is the only closer; any other account hits Unauthorized with no draft or close detail | spec AC-01, AC-06 |
+| Error handling | `AppError` at app; adapters translate Telegram and vendor failures into it | repo ADR-0002 |
+| ID strategy | Time-sortable ULID for persisted rows | repo ADR-0003 |
+| Internationalisation | N/A — one operator, one language the closer already uses in the group | — |
+| Observability | Closer wall-clock + full egress list; no tracing SaaS | §7, ADR-0002 |
+| Events | None — in-process synchronous calls | §4, ADR-0004 |
+| Secrets | Bot token from the environment; Telegram user session on the data volume next to the SQLite file | ADR-0007 |
+| Rate limiting | No product limiter; adapters respect Telegram flood limits | infra |
 
 ## 9. Architecture decisions
 
