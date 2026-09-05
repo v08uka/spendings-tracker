@@ -49,6 +49,10 @@ build/
 data/*.sqlite
 data/*.sqlite-journal
 
+# Telethon user-session login (and journal siblings) + local secrets
+data/*.session*
+.env
+
 # Per-developer SDD / worktrees
 .claude/*.local.md
 .worktrees/
