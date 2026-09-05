@@ -272,17 +272,17 @@ One Compose service `app` and one named volume `spendings-state` mounted at `/da
 
 ## 9. Architecture decisions
 
-<!-- 🎯 Why: the REVERSE INDEX onto the adr/ folder. `ls adr/` gives the files; §9 gives the
-     semantics — why they exist, which SAD section they attach to, what status.
-     📋 Write: a 4-column table, one row per ADR. Mixed status is fine.
-     📌 e.g. «0001 | Store content as a table of typed blocks | Accepted | §4». -->
-
 | # | Title | Status | Section |
 |---|---|---|---|
-| <NNNN> | <imperative — e.g. "Use a sliding-window counter for rate limiting"> | Accepted | §<N> |
-| <NNNN> | <imperative — e.g. "Co-locate the worker in the API process"> | Accepted | §<N> |
+| 0001 | Freeze the category list after first-run | Accepted | §1 |
+| 0002 | Persist every egress line for closer review | Accepted | §1 |
+| 0003 | Use Bot UI and user-session harvest | Accepted | §4 |
+| 0004 | Run the close pipeline synchronously | Accepted | §4 |
+| 0005 | Apply the shop map before the model | Accepted | §4 |
+| 0006 | Split closer-UI and harvest ports | Accepted | §5 |
+| 0007 | Store the user session on the data volume | Accepted | §8 |
 
-ADR files live under `docs/features/<slug>/adr/NNNN-<title>.md`.
+ADR files live under `docs/features/spendings-tracker/adr/NNNN-<title>.md`. Repo-level ADRs 0001–0003 (Python + Compose, hexagonal layers, SQLite) stay in `docs/adr/` and are constraints, not rows here.
 
 ## 10. Quality requirements
 
