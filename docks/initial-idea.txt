@@ -1,0 +1,40 @@
+I want to create a Telegram bot
+This can be run locally on this computer for now
+The idea: 
+My family has a Telegram group
+A member posts a message about expenses
+for example "Products Spar /n 1500" - which means that 1500 <default currency> was spent on Products
+
+when a report for a specific month is requested - the bot should be able to
+1. read messages for the specific month
+2. generate a context for the LLM API for a monthly report on which category, how much was spent (Categories are still primitive)
+3. Correctly handling the currency (if it is not specified - take the default currency)
+4. Send a request to the LLM API (for now I don't want to be tied to a specific LMM, so I would like it to be an abstraction over: OpenAI (some cost effective) & Monosnap (Kimi 2.7))
+5. Process the response and send me a response
+6. Save/edit state/settings e.g. prefered categories, default currency, output currency/currencies
+7. Save the report (by month) for Future comparsion
+
+on bot initialization
+1. setup currencies: default and report output
+2. setup default categories or allow LLM chose them
+3. optionally: set the <Store/Place Name - category> map and save it (for more deterministic mapping)
+
+
+NON-FUNCTIONAL
+docker infrastracture for the app/bot
+security for api-keys
+db with state/settings
+readme
+how to setup - readme
+bot do not have to be running always - I can run shell commands, boot bot, genegate report then kill the containers (extept db-state), and do it again next month. 
+
+OUT OF SCOPE (Future plans)
+Photo to text: Processing receipt photos for more accurate categorization
+Cloud deploying
+Multi-user/familyChat - allow others using the bot for some price/limits
+Reports as a pictures
+Compare saved monthly reports
+Yearly report
+Yearly/monthly scheduled spendings e.g. rent, tutition fee, subscriptions
+Spending advisor: Gaps, overspendings, habbits, investments...
+voice-to text for voice messages
