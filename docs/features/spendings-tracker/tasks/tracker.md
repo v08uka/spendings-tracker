@@ -40,4 +40,4 @@
 | # | Cluster | Status |
 |---|---|---|
 | R5 | SCR-04 Handle picks (S1-01) | done |
-| R6 | SCR-05 assign follow-up + AC-12 on the bot (S1-02) | todo |
+| R6 | SCR-05 assign follow-up + AC-12 on the bot (S1-02) | done |

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from spendings_tracker.app.errors import AppError
+from spendings_tracker.domain.shop import shop_key
 from spendings_tracker.infra.telegram_bot import TelegramBot
 from spendings_tracker.ports.harvest import FamilyGroupMessage
 from spendings_tracker.ports.persistence import (
@@ -72,7 +73,7 @@ class FakePersistence:
         return mapping
 
     def find_shop_mapping(self, shop_display):
-        return None
+        return self.mappings.get(shop_key(shop_display))
 
     def list_shop_mappings(self):
         return tuple(self.mappings.values())
@@ -206,6 +207,40 @@ def test_draft_reply_shows_handle_picks_and_closer_saves_from_them() -> None:
     assert saved is not None
     assert saved.screen == "SCR-06"
     assert store.draft is None
+
+
+def test_assign_category_from_scr05_grows_map_for_later_close() -> None:
+    store = FakePersistence()
+    harvest = FakeHarvest([FamilyGroupMessage("1", "Lidl 12.00")])
+    bot = _ready_bot(store, harvest)
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    picked = bot.handle_private("10001", "dm-1", _handle_pick(draft.text, "Lidl"))
+    assert picked is not None
+    assert picked.screen == "SCR-05"
+    assign = bot.handle_private("10001", "dm-1", "[ Assign category ]")
+    assert assign is not None
+    assert assign.screen == "SCR-05"
+    assert "Assign a confirmed category" in assign.text
+    assert "[ Groceries ]" in assign.text
+    assert "Uncategorized is not on this list" in assign.text
+    assigned = bot.handle_private("10001", "dm-1", "[ Groceries ]")
+    assert assigned is not None
+    assert assigned.screen == "SCR-04"
+    assert "Groceries" in assigned.text
+    saved = bot.handle_private("10001", "dm-1", "/save")
+    assert saved is not None
+    assert saved.screen == "SCR-06"
+    harvest.messages = [
+        FamilyGroupMessage("2", " lidl 5.00"),
+        FamilyGroupMessage("3", "Lidl Express 3.00"),
+    ]
+    later = bot.handle_private("10001", "dm-1", "/close 2026-07")
+    assert later is not None
+    assert later.screen == "SCR-04"
+    assert "[ Handle: Lidl Express ]" in later.text
+    assert "[ Handle: lidl ]" not in later.text
+    assert "Groceries" in later.text
 
 
 def test_handle_choice_returns_updated_private_draft() -> None:

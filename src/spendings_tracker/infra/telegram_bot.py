@@ -69,6 +69,7 @@ class TelegramBot:
         self._now = now
         self._pending_currency: dict[str, str] = {}
         self._pending_line: dict[str, str] = {}
+        self._pending_assign: set[str] = set()
 
     def handle_group(self, user_id: str, chat_id: str, text: str) -> BotReply | None:
         return None
@@ -93,6 +94,8 @@ class TelegramBot:
             return self._pick_suspect(user_id, chat_id, shop)
         if label is not None and label in HANDLE_LABELS:
             return self._apply_choice(user_id, chat_id, HANDLE_LABELS[label])
+        if label is not None and user_id in self._pending_assign:
+            return self._assign_named_category(user_id, chat_id, label)
         if stripped.startswith("handle "):
             return self._handle(user_id, chat_id, stripped)
         if settings is None:
@@ -163,7 +166,62 @@ class TelegramBot:
         extra: str | None = None,
     ) -> BotReply:
         line_id = self._pending_line.get(user_id, "")
+        if choice is HandleChoice.ASSIGN_CATEGORY and extra is None:
+            self._pending_assign.add(user_id)
+            return self._scr05_assign(chat_id, line_id)
         return self._run_handle(user_id, chat_id, line_id, choice, extra)
+
+    def _assign_named_category(
+        self, user_id: str, chat_id: str, name: str
+    ) -> BotReply:
+        settings = self._persistence.load_settings()
+        if settings is None:
+            err = catalog_error("save.no_draft")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-02", code=err.code
+            )
+        found = next(
+            (category for category in settings.categories if category.name == name),
+            None,
+        )
+        if found is None:
+            err = catalog_error("handle.unknown_category")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-05", code=err.code
+            )
+        self._pending_assign.discard(user_id)
+        line_id = self._pending_line.get(user_id, "")
+        return self._run_handle(
+            user_id, chat_id, line_id, HandleChoice.ASSIGN_CATEGORY, found.id
+        )
+
+    def _scr05_assign(self, chat_id: str, line_id: str) -> BotReply:
+        draft = self._persistence.load_draft()
+        settings = self._persistence.load_settings()
+        if draft is None or settings is None:
+            err = catalog_error("save.no_draft")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-02", code=err.code
+            )
+        found = next((line for line in draft.lines if line.id == line_id), None)
+        if found is None:
+            err = catalog_error("draft.line_not_found")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-05", code=err.code
+            )
+        picks = "\n".join(
+            f"  [ {category.name} ]" for category in settings.categories
+        )
+        return BotReply(
+            chat_id=chat_id,
+            text=(
+                "Assign a confirmed category\n\n"
+                f"Shop: {found.shop_display}\n"
+                f"{picks}\n"
+                "Uncategorized is not on this list."
+            ),
+            screen="SCR-05",
+        )
 
     def _run_handle(
         self,

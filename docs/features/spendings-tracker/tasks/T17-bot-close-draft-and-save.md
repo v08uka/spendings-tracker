@@ -3,7 +3,7 @@ id: T17
 title: "Map harvest, draft, handle, and save onto the closer bot"
 layer: "ports"
 deps: ["T12", "T13", "T14", "T16"]
-acs: ["AC-03", "AC-04", "AC-05", "AC-08", "AC-09", "AC-13", "AC-15", "AC-16", "AC-18", "AC-19"]
+acs: ["AC-03", "AC-04", "AC-05", "AC-08", "AC-09", "AC-12", "AC-13", "AC-15", "AC-16", "AC-18", "AC-19"]
 files_hint: ["src/spendings_tracker/ports/closer_ui.py", "src/spendings_tracker/infra/telegram_bot.py", "tests/infra/test_telegram_bot_close.py"]
 owner: "Dell"
 estimate: "L"
