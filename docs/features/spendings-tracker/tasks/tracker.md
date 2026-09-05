@@ -6,7 +6,7 @@
 | # | Task | Layer | Owner | Estimate | Blocked by | Status |
 |---|---|---|---|---|---|---|
 | T1 | Promote settings, categories, and shop-mapping migrations | migration | Dell | S | — | done |
-| T2 | Promote drafts and draft-lines migration | migration | Dell | S | T1 | todo |
+| T2 | Promote drafts and draft-lines migration | migration | Dell | S | T1 | done |
 | T3 | Promote monthly-close and egress-line migrations | migration | Dell | S | T2 | todo |
 | T4 | Encode spend-looking detection and pair splitting | domain | Dell | M | — | done |
 | T5 | Encode completed-month, shop-key, and frozen-category rules | domain | Dell | M | — | done |
