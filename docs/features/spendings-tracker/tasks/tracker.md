@@ -16,7 +16,7 @@
 | T9 | Add HarvestPort and the user-session harvest adapter | infra | Dell | L | — | done |
 | T10 | Add ModelPort that accepts only spend-looking lines | infra | Dell | M | T4 | done |
 | T11 | Implement complete-first-run use case | app | Dell | M | T7, T5 | done |
-| T12 | Implement harvest-month and private-draft pipeline | app | Dell | L | T8, T9, T10, T4, T11 | todo |
+| T12 | Implement harvest-month and private-draft pipeline | app | Dell | L | T8, T9, T10, T4, T11 | done |
 | T13 | Implement handle-suspect and shop-map growth | app | Dell | M | T8, T6 | todo |
 | T14 | Implement save-monthly-close | app | Dell | M | T8, T6 | todo |
 | T15 | Implement resume-on-start | app | Dell | M | T8, T11 | todo |
