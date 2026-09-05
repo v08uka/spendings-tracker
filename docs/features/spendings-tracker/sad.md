@@ -286,29 +286,22 @@ ADR files live under `docs/features/spendings-tracker/adr/NNNN-<title>.md`. Repo
 
 ## 10. Quality requirements
 
-<!-- 🎯 Why: the QUALITY TREE — take a goal from §1 and break it into concrete leaves: tests,
-     metrics, configs, drills. ⭐ Without §10, §1 is a manifesto. With §10 each declaration maps
-     to something PROVABLE.
-     📋 Write: per §1 goal — When / Then / How-verify. Numbers from spec §6 NFR VERBATIM (don't
-     round ≤250ms to ≤300ms — that's a critic F6 hit).
-     📌 e.g. «p95 ≤ 500 ms on a block update, verified by a 100 req/s load test». -->
+Each top-3 goal from §1 expanded into a full scenario. Numbers from spec §6 NFR verbatim.
 
-Each top-3 goal from §1 expanded into a full scenario:
+**QG-1. Spend-looking-only egress**
+- **When:** lines are sent off the machine for classification
+- **Then:** 100% of text sent off the machine for classification is spend-looking lines
+- **How verify:** a harvest fixture with mixed family-group talk; the persisted egress list equals the lines passed to `ModelPort` and contains no other talk; the closer can open that full list for the close
 
-**QG-1. <quality attribute>**
-- **When:** <trigger condition>
-- **Then:** <expected behaviour with numbers from spec §6 NFR>
-- **How verify:** <test / chaos drill / load test / metric>
+**QG-2. Time-to-draft**
+- **When:** the closer asks for a completed UTC month that has at most 500 family-group messages
+- **Then:** the draft is visible in ≤ 180 seconds (closer wall-clock from asking until the draft is visible). Months with more than 500 messages are still harvested in full with no 180-second promise
+- **How verify:** a timed app-layer test with a fake `HarvestPort` of 500 messages and a fake `ModelPort`; assert wall-clock. A separate case with more than 500 messages asserts completeness, not the 180-second bound
 
-**QG-2. <quality attribute>**
-- **When:** <trigger>
-- **Then:** <expected>
-- **How verify:** <how>
-
-**QG-3. <quality attribute>**
-- **When:** <trigger>
-- **Then:** <expected>
-- **How verify:** <how>
+**QG-3. Recoverability after an on-demand stop**
+- **When:** the closer stops after saving settings and a monthly close, or with a draft in progress (including handles already made)
+- **Then:** a later start still has the default currency, frozen category list, shop-to-category map, saved monthly close, and any in-progress draft. Unplanned stop during a close: fewer than 1 in 10 starts
+- **How verify:** stop/start against the real SQLite file in a test. The unplanned-stop rate is the closer’s own count (spec measurement), not an automated flake quota
 
 ## 11. Risks and technical debt
 
