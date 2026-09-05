@@ -187,6 +187,16 @@ def _handle_pick(text: str, shop: str | None = None) -> str:
     raise AssertionError(f"no handle pick for {shop!r} in:\n{text}")
 
 
+def _amount_from_prompt(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            inner = stripped[1:-1].strip()
+            if inner and inner[0].isdigit():
+                return inner
+    raise AssertionError(f"no amount pick in:\n{text}")
+
+
 def test_draft_reply_shows_handle_picks_and_closer_saves_from_them() -> None:
     store = FakePersistence()
     bot = _ready_bot(
@@ -380,7 +390,12 @@ def test_pick_suspect_builds_scr05_then_returns_updated_draft() -> None:
     assert "confirm uncategorized" in lowered
     assert "leave other currency" in lowered
     assert "exclude" in lowered
-    missing = bot.handle_private("10001", "dm-1", "[ Enter amount ]")
+    asked = bot.handle_private("10001", "dm-1", "[ Enter amount ]")
+    assert asked is not None
+    assert asked.screen == "SCR-05"
+    assert "Enter the amount" in asked.text
+    assert "Amount is required" not in asked.text
+    missing = bot.handle_private("10001", "dm-1", "not-a-number")
     assert missing is not None
     assert missing.screen == "SCR-05"
     assert "Amount is required" in missing.text
@@ -388,6 +403,42 @@ def test_pick_suspect_builds_scr05_then_returns_updated_draft() -> None:
     assert handled is not None
     assert handled.screen == "SCR-04"
     assert "Private draft" in handled.text
+
+
+def test_enter_amount_from_scr05_prompt_updates_picked_line() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store,
+        FakeHarvest(
+            [
+                FamilyGroupMessage("1", "Cafe 1.00"),
+                FamilyGroupMessage("2", "Cafe 2.00"),
+            ]
+        ),
+    )
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    assert draft.screen == "SCR-04"
+    picked = bot.handle_private("10001", "dm-1", _handle_pick(draft.text, "Cafe"))
+    assert picked is not None
+    assert picked.screen == "SCR-05"
+    assert "Cafe" in picked.text
+    prompt = bot.handle_private("10001", "dm-1", "[ Enter amount ]")
+    assert prompt is not None
+    assert prompt.screen == "SCR-05"
+    assert "Enter the amount" in prompt.text
+    assert "Cafe" in prompt.text
+    amount = _amount_from_prompt(prompt.text)
+    updated = bot.handle_private("10001", "dm-1", amount)
+    assert updated is not None
+    assert updated.screen == "SCR-04"
+    assert "Private draft" in updated.text
+    assert amount in updated.text
+    assert store.draft is not None
+    assert store.draft.lines[0].amount == amount
+    assert store.draft.lines[0].is_handled is True
+    assert store.draft.lines[1].amount == "2.00"
+    assert store.draft.lines[1].is_handled is False
 
 
 def test_malformed_close_and_unknown_handle_are_app_errors() -> None:

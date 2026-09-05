@@ -258,6 +258,18 @@
         "src/spendings_tracker/infra/telegram_bot.py",
         "tests/infra/test_telegram_bot_close.py"
       ]
+    },
+    {
+      "id": "R7",
+      "title": "Ask for the amount after SCR-05 enter_amount",
+      "layer": "ports",
+      "deps": ["R6"],
+      "acs": ["AC-09"],
+      "dod": "After [ Enter amount ], the bot asks for the amount and applies it to _pending_line; a bot test goes draft → Handle pick → Enter amount → type the amount from that prompt → updated SCR-04, using only reply-visible tokens, including when two suspects share shop_display.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
     }
   ]
 }

@@ -70,6 +70,7 @@ class TelegramBot:
         self._pending_currency: dict[str, str] = {}
         self._pending_line: dict[str, str] = {}
         self._pending_assign: set[str] = set()
+        self._pending_amount: set[str] = set()
 
     def handle_group(self, user_id: str, chat_id: str, text: str) -> BotReply | None:
         return None
@@ -96,6 +97,9 @@ class TelegramBot:
             return self._apply_choice(user_id, chat_id, HANDLE_LABELS[label])
         if label is not None and user_id in self._pending_assign:
             return self._assign_named_category(user_id, chat_id, label)
+        if user_id in self._pending_amount:
+            extra = label if label is not None else stripped
+            return self._submit_amount(user_id, chat_id, extra)
         if stripped.startswith("handle "):
             return self._handle(user_id, chat_id, stripped)
         if settings is None:
@@ -169,6 +173,9 @@ class TelegramBot:
         if choice is HandleChoice.ASSIGN_CATEGORY and extra is None:
             self._pending_assign.add(user_id)
             return self._scr05_assign(chat_id, line_id)
+        if choice is HandleChoice.ENTER_AMOUNT and extra is None:
+            self._pending_amount.add(user_id)
+            return self._scr05_amount(chat_id, line_id)
         return self._run_handle(user_id, chat_id, line_id, choice, extra)
 
     def _assign_named_category(
@@ -193,6 +200,41 @@ class TelegramBot:
         line_id = self._pending_line.get(user_id, "")
         return self._run_handle(
             user_id, chat_id, line_id, HandleChoice.ASSIGN_CATEGORY, found.id
+        )
+
+    def _submit_amount(self, user_id: str, chat_id: str, extra: str) -> BotReply:
+        line_id = self._pending_line.get(user_id, "")
+        reply = self._run_handle(
+            user_id, chat_id, line_id, HandleChoice.ENTER_AMOUNT, extra
+        )
+        if reply.code != "handle.invalid_amount":
+            self._pending_amount.discard(user_id)
+        return reply
+
+    def _scr05_amount(self, chat_id: str, line_id: str) -> BotReply:
+        draft = self._persistence.load_draft()
+        settings = self._persistence.load_settings()
+        if draft is None or settings is None:
+            err = catalog_error("save.no_draft")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-02", code=err.code
+            )
+        found = next((line for line in draft.lines if line.id == line_id), None)
+        if found is None:
+            err = catalog_error("draft.line_not_found")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-05", code=err.code
+            )
+        example = found.amount or "9.50"
+        return BotReply(
+            chat_id=chat_id,
+            text=(
+                "Enter the amount\n\n"
+                f"Shop: {found.shop_display}\n"
+                f"  [ {example} ]\n"
+                "Type the amount."
+            ),
+            screen="SCR-05",
         )
 
     def _scr05_assign(self, chat_id: str, line_id: str) -> BotReply:
@@ -273,7 +315,7 @@ class TelegramBot:
                 screen="SCR-05",
                 code=err.code,
             )
-        return self._run_handle(user_id, chat_id, line_id, choice, extra)
+        return self._apply_choice(user_id, chat_id, choice, extra=extra)
 
     def _save(self, chat_id: str) -> BotReply:
         settings = self._persistence.load_settings()
