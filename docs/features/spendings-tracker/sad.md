@@ -242,23 +242,19 @@ sequenceDiagram
 
 ## 7. Deployment view
 
-<!-- 🎯 Why: the TOPOLOGY DevOps must know without reading the deploy charts — how many replicas,
-     where the background worker lives, AT WHAT NUMBERS we scale.
-     📋 Write: 2–3 sentences on topology + monitoring + concrete threshold numbers.
-     📌 e.g. «500 authors → partition by quarter» (not «we'll think about scale later»).
-     🎯 N/A allowed for XS/S that reuses an existing deployment unit with no change.
-     Deployment-diagram scaffold → templates/deployment.md. -->
-
-<Topology in 2–3 sentences. Where it runs, replicas, scaling thresholds.>
+One Compose service `app` and one named volume `spendings-state` mounted at `/data`. The closer starts the stack for a close and stops it afterwards. There are no replicas, no load balancer, and no always-on host. While the process is up it long-polls Telegram; a public webhook URL would require hosting the spec forbids.
 
 **Monitoring:**
-- <Metrics — e.g. `<metric_name>`>
-- <Alerts — e.g. «worker lag > 10 min → page on-call»>
-- <Tracing — e.g. spans on the request boundary>
+- Time-to-ready — closer wall-clock from start until they can ask for a month or finish first-run (spec §6: ≤ 60 seconds)
+- Time-to-draft — closer wall-clock from ask until the draft is visible (spec §6: ≤ 180 seconds for a month with at most 500 family-group messages)
+- Egress review — persisted list of every spend-looking line that left (ADR-0002)
+- Unplanned stop — closer’s own count (spec §6: fewer than 1 in 10 starts)
+- Tracing — none in v1 (no hosted operator, no on-call)
 
 **Scaling thresholds:**
-- <e.g. comfortable in one table up to N rows/year>
-- <e.g. partition by quarter above N rows/year>
+- One household, one writer, one in-progress draft
+- One SQLite file stays the store for a family-group month, including months with more than 500 messages (harvested in full, no 180-second promise)
+- Do not run a second copy against the same file (repo ADR-0003)
 
 ## 8. Crosscutting concepts
 
