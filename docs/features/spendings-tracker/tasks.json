@@ -1,0 +1,323 @@
+{
+  "slug": "spendings-tracker",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Promote settings, categories, and shop-mapping migrations",
+      "layer": "migration",
+      "deps": [],
+      "acs": ["AC-01", "AC-12"],
+      "dod": "Staged 01 and 02 are promoted to live Alembic revisions; upgrade and downgrade apply and revert cleanly.",
+      "files_hint": [
+        "docs/features/spendings-tracker/migrations/01_create_settings.up.sql",
+        "docs/features/spendings-tracker/migrations/01_create_settings.down.sql",
+        "docs/features/spendings-tracker/migrations/02_create_shop_mappings.up.sql",
+        "docs/features/spendings-tracker/migrations/02_create_shop_mappings.down.sql"
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Promote drafts and draft-lines migration",
+      "layer": "migration",
+      "deps": ["T1"],
+      "acs": ["AC-05", "AC-11", "AC-18"],
+      "dod": "Staged 03 is promoted; upgrade and downgrade apply and revert cleanly; at most one drafts row is a schema-plus-app concern documented on the revision.",
+      "files_hint": [
+        "docs/features/spendings-tracker/migrations/03_create_drafts.up.sql",
+        "docs/features/spendings-tracker/migrations/03_create_drafts.down.sql"
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Promote monthly-close and egress-line migrations",
+      "layer": "migration",
+      "deps": ["T2"],
+      "acs": ["AC-07", "AC-08", "AC-19"],
+      "dod": "Staged 04 and 05 are promoted; upgrade and downgrade apply and revert cleanly including unique utc_month on monthly_closes.",
+      "files_hint": [
+        "docs/features/spendings-tracker/migrations/04_create_monthly_closes.up.sql",
+        "docs/features/spendings-tracker/migrations/04_create_monthly_closes.down.sql",
+        "docs/features/spendings-tracker/migrations/05_create_egress_lines.up.sql",
+        "docs/features/spendings-tracker/migrations/05_create_egress_lines.down.sql"
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Encode spend-looking detection and pair splitting",
+      "layer": "domain",
+      "deps": [],
+      "acs": ["AC-07", "AC-05", "AC-10"],
+      "dod": "Unit tests accept a line with an amount-like number plus other non-numeric text, reject other talk, and split one family-group message into several spend-looking lines.",
+      "files_hint": [
+        "src/spendings_tracker/domain/spend_looking.py",
+        "tests/domain/test_spend_looking.py"
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Encode completed-month, shop-key, and frozen-category rules",
+      "layer": "domain",
+      "deps": [],
+      "acs": ["AC-15", "AC-12", "AC-14"],
+      "dod": "Unit tests refuse the current incomplete UTC month, match shops after trim and case only, and refuse an empty confirmed category list (Uncategorized does not count).",
+      "files_hint": [
+        "src/spendings_tracker/domain/month.py",
+        "src/spendings_tracker/domain/shop.py",
+        "src/spendings_tracker/domain/categories.py",
+        "tests/domain/test_month.py",
+        "tests/domain/test_shop.py",
+        "tests/domain/test_categories.py"
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "Encode draft, suspect, handle, and total rules",
+      "layer": "domain",
+      "deps": [],
+      "acs": ["AC-08", "AC-09"],
+      "dod": "Unit tests classify suspect versus clean, accept each handle choice, omit excluded lines from totals, and keep other-currency lines out of default-currency totals.",
+      "files_hint": [
+        "src/spendings_tracker/domain/draft.py",
+        "tests/domain/test_draft.py"
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "Persist settings, categories, and shop mappings",
+      "layer": "infra",
+      "deps": ["T1", "T5"],
+      "acs": ["AC-01", "AC-11", "AC-12"],
+      "dod": "SQLite adapter round-trips the settings singleton, frozen categories, and shop mappings with ULID ids; a second settings row is refused.",
+      "files_hint": [
+        "src/spendings_tracker/ports/persistence.py",
+        "src/spendings_tracker/infra/sqlite.py",
+        "src/spendings_tracker/infra/ulid.py",
+        "tests/infra/test_sqlite_settings.py"
+      ]
+    },
+    {
+      "id": "T8",
+      "title": "Persist drafts, monthly closes, and egress lines",
+      "layer": "infra",
+      "deps": ["T2", "T3", "T6", "T7"],
+      "acs": ["AC-05", "AC-08", "AC-11", "AC-19"],
+      "dod": "SQLite adapter round-trips one draft with lines, replaces a monthly close by utc_month, and copies egress rows onto the saved close.",
+      "files_hint": [
+        "src/spendings_tracker/ports/persistence.py",
+        "src/spendings_tracker/infra/sqlite.py",
+        "tests/infra/test_sqlite_draft.py"
+      ]
+    },
+    {
+      "id": "T9",
+      "title": "Add HarvestPort and the user-session harvest adapter",
+      "layer": "infra",
+      "deps": [],
+      "acs": ["AC-03", "AC-04", "AC-17"],
+      "dod": "Harvest adapter returns a completed month's family-group messages with no export file and no silent drop; an unreadable month becomes AppError harvest.month_not_obtained.",
+      "files_hint": [
+        "src/spendings_tracker/ports/harvest.py",
+        "src/spendings_tracker/infra/telegram_harvest.py",
+        "tests/infra/test_telegram_harvest.py"
+      ]
+    },
+    {
+      "id": "T10",
+      "title": "Add ModelPort that accepts only spend-looking lines",
+      "layer": "infra",
+      "deps": ["T4"],
+      "acs": ["AC-07"],
+      "dod": "Model adapter refuses non-spend-looking text before any send and returns categories or Uncategorized only for lines that passed the on-machine gate.",
+      "files_hint": [
+        "src/spendings_tracker/ports/model.py",
+        "src/spendings_tracker/infra/language_model.py",
+        "tests/infra/test_language_model.py"
+      ]
+    },
+    {
+      "id": "T11",
+      "title": "Implement complete-first-run use case",
+      "layer": "app",
+      "deps": ["T7", "T5"],
+      "acs": ["AC-01", "AC-02", "AC-14"],
+      "dod": "Unit tests with a fake PersistencePort confirm currency and a non-empty list, pin the closer, and return first_run.empty_category_list or first_run.still_required on the error paths.",
+      "files_hint": [
+        "src/spendings_tracker/app/complete_first_run.py",
+        "src/spendings_tracker/app/errors.py",
+        "tests/app/test_complete_first_run.py"
+      ]
+    },
+    {
+      "id": "T12",
+      "title": "Implement harvest-month and private-draft pipeline",
+      "layer": "app",
+      "deps": ["T8", "T9", "T10", "T4", "T11"],
+      "acs": ["AC-03", "AC-04", "AC-05", "AC-07", "AC-10", "AC-15", "AC-16", "AC-17", "AC-18"],
+      "dod": "Unit tests with fake HarvestPort and ModelPort cover incomplete, unreadable, busy, empty, and large months, spend-looking-only egress, and a private draft the family group never receives.",
+      "files_hint": [
+        "src/spendings_tracker/app/harvest_month.py",
+        "tests/app/test_harvest_month.py"
+      ]
+    },
+    {
+      "id": "T13",
+      "title": "Implement handle-suspect and shop-map growth",
+      "layer": "app",
+      "deps": ["T8", "T6"],
+      "acs": ["AC-09", "AC-12"],
+      "dod": "Unit tests persist each handle choice, upsert the shop map on assign_category, and leave a different remaining spelling unmapped.",
+      "files_hint": [
+        "src/spendings_tracker/app/handle_suspect.py",
+        "tests/app/test_handle_suspect.py"
+      ]
+    },
+    {
+      "id": "T14",
+      "title": "Implement save-monthly-close",
+      "layer": "app",
+      "deps": ["T8", "T6"],
+      "acs": ["AC-08", "AC-09", "AC-13", "AC-19"],
+      "dod": "Unit tests save only when every suspect is handled, refuse save.no_draft and save.unhandled_suspect, and replace an existing close for the same utc_month.",
+      "files_hint": [
+        "src/spendings_tracker/app/save_monthly_close.py",
+        "tests/app/test_save_monthly_close.py"
+      ]
+    },
+    {
+      "id": "T15",
+      "title": "Implement resume-on-start",
+      "layer": "app",
+      "deps": ["T8", "T11"],
+      "acs": ["AC-11"],
+      "dod": "Unit tests load settings, map, saved close, and an in-progress draft including handles already made after a stop, with no first-run re-entry.",
+      "files_hint": [
+        "src/spendings_tracker/app/resume.py",
+        "tests/app/test_resume.py"
+      ]
+    },
+    {
+      "id": "T16",
+      "title": "Map first-run and AuthZ onto the closer bot",
+      "layer": "ports",
+      "deps": ["T11"],
+      "acs": ["AC-01", "AC-02", "AC-06", "AC-14"],
+      "dod": "Bot adapter runs the first-run wizard and returns auth.not_closer with no draft or close detail; inbound family-group talk is silence.",
+      "files_hint": [
+        "src/spendings_tracker/ports/closer_ui.py",
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_first_run.py"
+      ]
+    },
+    {
+      "id": "T17",
+      "title": "Map harvest, draft, handle, and save onto the closer bot",
+      "layer": "ports",
+      "deps": ["T12", "T13", "T14", "T16"],
+      "acs": ["AC-03", "AC-04", "AC-05", "AC-08", "AC-09", "AC-12", "AC-13", "AC-15", "AC-16", "AC-18", "AC-19"],
+      "dod": "Bot adapter maps /close, the suspect conversation, and /save to the contract outcomes and screens SCR-02 through SCR-06.",
+      "files_hint": [
+        "src/spendings_tracker/ports/closer_ui.py",
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
+    },
+    {
+      "id": "T18",
+      "title": "Wire the process and prove the quality goals",
+      "layer": "wiring",
+      "deps": ["T15", "T17", "T9", "T10"],
+      "acs": ["AC-07", "AC-11"],
+      "dod": "__main__ constructs adapters and injects them at ports; QG-1 egress fixture, QG-2 timed 500-message fake, and QG-3 stop/start against real SQLite pass; smoke boot still passes.",
+      "files_hint": [
+        "src/spendings_tracker/__main__.py",
+        "compose.yaml",
+        "tests/test_smoke.py",
+        "tests/app/test_quality_goals.py"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "Show SCR-04 Handle picks the closer can use",
+      "layer": "ports",
+      "deps": ["T17"],
+      "acs": ["AC-09", "AC-08"],
+      "dod": "Private-draft reply lists each remaining suspect as a Handle pick; a bot test goes draft reply → pick → handle using only that reply, then /save.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
+    },
+    {
+      "id": "R6",
+      "title": "Offer frozen categories on SCR-05 assign and grow the shop map",
+      "layer": "ports",
+      "deps": ["R5"],
+      "acs": ["AC-12"],
+      "dod": "assign_category on SCR-05 lists confirmed category names; a bot test assigns one, grows the map, and a later /close files that shop (trim+case) while a different spelling stays unmapped.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
+    },
+    {
+      "id": "R7",
+      "title": "Ask for the amount after SCR-05 enter_amount",
+      "layer": "ports",
+      "deps": ["R6"],
+      "acs": ["AC-09"],
+      "dod": "After [ Enter amount ], the bot asks for the amount and applies it to _pending_line; a bot test goes draft → Handle pick → Enter amount → type the amount from that prompt → updated SCR-04, using only reply-visible tokens, including when two suspects share shop_display.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
+    },
+    {
+      "id": "R9",
+      "title": "Obtain a completed month from the Telethon date window",
+      "layer": "infra",
+      "deps": ["T9"],
+      "acs": ["AC-03", "AC-17"],
+      "dod": "TelethonFamilyGroupReader harvests [start, end) (offset_date is not the month end with reverse=True). A reader test with a fake client keeps in-month messages, drops outside ones, and does not drop a 501-message month.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_session.py",
+        "tests/infra/test_telegram_session.py"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Drive first-run from published SCR-01 tokens",
+      "layer": "ports",
+      "deps": ["T16"],
+      "acs": ["AC-01", "AC-14"],
+      "dod": "SCR-01 publishes [ Keep EUR ], [ Change… ], and [ Confirm list ]. First-run tests reach Ready using only those tokens (Keep/Change via _bracket_label; Confirm list uses the proposed names).",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_first_run.py"
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "Ignore Telethon session and .env secrets",
+      "layer": "wiring",
+      "deps": [],
+      "acs": [],
+      "dod": ".gitignore covers data/*.session* (and Telethon journal siblings) and .env so the user-session login file cannot be committed.",
+      "files_hint": [
+        ".gitignore",
+        "tests/infra/test_gitignore_secrets.py"
+      ]
+    },
+    {
+      "id": "R12",
+      "title": "Clear leftover follow-up state on /start and a new Handle pick",
+      "layer": "ports",
+      "deps": ["R7"],
+      "acs": ["AC-11"],
+      "dod": "/start and a new Handle pick call _clear_follow_ups. Bot tests: Enter amount then /start returns SCR-04 and a later 99.00 does not write the line; assign then /start then [ Groceries ] does not assign.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
+    }
+  ]
+}
