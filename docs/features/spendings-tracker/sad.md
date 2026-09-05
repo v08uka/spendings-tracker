@@ -38,30 +38,29 @@ The confirmed category list stays frozen after first-run (ADR-0001). The closer�
 
 ## 2. Constraints
 
-<!-- 🎯 Why: §4 strategy only works when §2 has fixed WHAT IS ALREADY FIXED — stack, versions,
-     deadline, regulatory. This is an input, not an output.
-     📋 Write: four blocks — Technical / Organisational / Conventions / Regulatory.
-     📌 Pin versions («<datastore> 18», not «<datastore>»). «Q3 deadline — hard», not «ideally».
-     Never N/A — every feature inherits at least Conventions + Technical. -->
-
 **Technical.**
-- <Language + version>
-- <Framework(s) + version>
-- <Datastore(s) + version>
-- <Architecture convention — e.g. the layering style from the project convention file>
+- Python 3.12 (`requires-python >=3.12,<3.13`). One process. No second service. In-process calls only.
+- Telegram is the closer’s UI; there is no in-repo frontend. The concrete Telegram library is not a §2 pin — it is a §4 choice (nothing in `pyproject.toml` yet).
+- State is one SQLite file via SQLAlchemy ≥2.0 and Alembic ≥1.14. Path from `SPENDINGS_DB_PATH`; Compose mounts volume `spendings-state` at `/data` (`/data/spendings.sqlite`). One writer.
+- Hexagonal layers in one package: `domain` / `app` / `ports` / `infra`. Domain and app do not import `infra`.
+- Persisted row IDs are time-sortable ULIDs (repo ADR-0003). The helper is not in source yet; that is implementation work, not a different ID scheme.
 
 **Organisational.**
-- <Effort budget — e.g. 3 person-weeks>
-- <Deadline — e.g. 2026-Q3 hard>
-- <Team composition>
+- No external deadline (spec §1). Waiting costs another unsummarized month, not a missed contract.
+- Size L: this feature fills the scaffolded skeleton (layers exist; use cases, ports, and schema do not).
+- Owner: Dell. Reviewers: Tech Lead, Security Lead.
 
 **Conventions.**
-- <Link to the project's convention file>
-- <Naming, ID strategy, error-handling pattern>
+- Follow `CLAUDE.md`, `docs/architecture-map.md`, and repo ADRs 0001–0003. Do not re-litigate that stack here.
+- One application error type: `AppError`. Adapters translate vendor and Telegram failures into it.
+- New use case → `app`. New chat or model vendor → `ports` + `infra`. New persisted concept → Alembic + persistence adapter.
+- Tests: `pytest` at domain/app with fakes at ports; one smoke test that the app boots. Toolchain: `uv sync` / `pytest` / `ruff check .`.
 
 **Regulatory / external.**
-- <e.g. data-retention / deletion behaviour per ADR-NNNN>
-- <e.g. applicable compliance controls, or N/A with a reason>
+- Data is confidential household data: amounts, shops, spend-looking line text, and the closer’s identity in the family group.
+- Only the account pinned as closer at first-run may see the draft or save a monthly close. The family group is never answered with draft or close detail.
+- Only spend-looking lines may leave the machine for a language-model service.
+- Security review is required (spec §6.1).
 
 ## 3. Context and scope
 
