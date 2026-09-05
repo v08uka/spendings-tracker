@@ -64,37 +64,39 @@ The confirmed category list stays frozen after first-run (ADR-0001). The closer�
 
 ## 3. Context and scope
 
-<!-- 🎯 Why: draws the SYSTEM BOUNDARY — who talks to it from outside, where the trust zone ends.
-     Without §3, §5 and §8 (authorization) blur — unclear what's «inside» vs «outside».
-     📋 Write: 2–3 sentences of business context + an external-systems table + a C4Context block.
-     📌 «External: none (deliberate, no third-party in v1)» is itself a decision worth stating.
-     Trust boundary — the line past which you don't trust data without checking it.
-     Never N/A — greenfield still draws the planned actors + external systems. -->
+The closer starts spendings-tracker when they want a monthly close. The system harvests that completed UTC month from the family group via Telegram, keeps non-spend talk on the machine, files spend-looking lines, and shows a private draft only to the closer. Family posters keep writing in the existing group and never become operators.
 
-<Business context in 2–3 sentences. What the system does for whom.>
+Two trust boundaries matter: (1) the machine vs language-model services — only spend-looking lines may cross; (2) the closer’s private chat vs the family group — the draft, a refusal about the draft, and other monthly-close detail never go to the group.
 
-<!-- brownfield: <one-line scan summary> (or «N/A — greenfield repo» if no source existed) -->
+<!-- brownfield: hexagonal skeleton after scaffold (HEAD 4056f74); architecture-map.md stale at a8f7fcc; layers empty except AppError, boot-and-exit __main__, empty Alembic 0001 -->
 
 **External systems (in / out):**
 
 | Actor or system | Type | Interaction |
 |---|---|---|
-| <author role> | Person | <what they do> |
-| <external service> | System (internal/external) | <interaction> |
-| <identity provider> | System (external) | <provides auth tokens> |
+| closer | Person | Starts the tool, finishes first-run, asks for a month, audits the private draft, saves |
+| family poster | Person | Writes shop-and-amount lines in the family group; does not talk to this system as an operator |
+| Telegram | System (external) | Family-group history in; closer commands and private draft out; never draft or close detail into the group |
+| Language-model services | System (external) | Receive already-selected spend-looking lines only; file them into the frozen category list or Uncategorized |
 
-**C4 Context (L1):** <!-- syntax → references/c4-mermaid-syntax.md. Real names, no <placeholder> stubs. -->
+**C4 Context (L1):**
 
 ```mermaid
 C4Context
-    title <feature> — System Context
+    title spendings-tracker — System Context
 
-    Person(actor, "<Actor role>", "<intent>")
-    System(app, "<Our system>", "<one-sentence description>")
-    System_Ext(ext, "<External system>", "<one-sentence description>")
+    Person(closer, "Closer", "Starts the tool, harvests a month, audits the private draft, saves")
+    Person(family_poster, "Family poster", "Writes shop-and-amount lines in the family group")
 
-    Rel(actor, app, "<interaction>", "<protocol>")
-    Rel(app, ext, "<interaction>", "<protocol>")
+    System(app, "spendings-tracker", "On-demand monthly close for the closer")
+    System_Ext(telegram, "Telegram", "Family group history and the closer private chat")
+    System_Ext(llm, "Language-model services", "Files already-selected spend-looking lines")
+
+    Rel(closer, telegram, "Commands and private draft", "Telegram")
+    Rel(family_poster, telegram, "Writes shop-and-amount lines", "Telegram")
+    Rel(telegram, app, "Closer commands and group history", "Telegram API")
+    Rel(app, telegram, "Private draft to the closer only", "Telegram API")
+    Rel(app, llm, "Spend-looking lines only", "HTTPS")
 ```
 
 ## 4. Solution strategy
