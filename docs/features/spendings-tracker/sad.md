@@ -160,31 +160,85 @@ C4Container
 
 ## 6. Runtime view
 
-<!-- 🎯 Why: the RUNTIME FLOW of 1–2 critical scenarios — who talks to whom, when, in what order.
-     Without §6, §5 is just boxes with no life.
-     📋 Write: a Mermaid sequenceDiagram. Participants are names from §5 (don't invent new ones).
-     Messages are semantic («saves a draft»), NO HTTP verbs / paths / status codes — endpoint-level
-     sequences arrive at the `api` stage.
-     📌 e.g. «author → web: composes draft → web → content API: save». Seed the primary flow(s) here;
-     the `sequences` stage then covers every §5 AC (no cap). Never N/A for M+; XS/S keeps ≥1 happy-path flow. -->
+Participants are the §5 containers and actors. Messages are semantic. `sequences` later covers every spec §5 acceptance criterion (first-run and stop/resume are not seeded here).
 
-**Critical flow 1: <flow name>**
+**Critical flow 1: harvest a completed month to a private draft**
 
 ```mermaid
 sequenceDiagram
-    actor Actor
-    participant Web
-    participant Service
-    participant Store
-    Actor->>Web: <action>
-    Web->>Service: <call>
-    Service->>Store: <write>
-    Store-->>Service: ok
-    Service-->>Web: result
-    Web-->>Actor: confirmation
+    actor closer
+    participant Telegram
+    participant bot as spendings-tracker
+    participant store as State file
+    participant llm as Language-model services
+
+    closer->>Telegram: asks for a completed UTC month
+    Telegram->>bot: closer command
+    bot->>store: load settings and in-progress draft
+    alt current incomplete UTC month
+        bot->>Telegram: only a completed UTC month can be requested
+        Telegram->>closer: stay on Ready
+    else in-progress draft already exists
+        bot->>Telegram: finish or replace the in-progress close first
+        Telegram->>closer: stay on the draft
+    else harvest cannot obtain the month
+        bot->>Telegram: month could not be obtained
+        Telegram->>closer: Harvest failed
+    else month obtained
+        bot->>Telegram: read that month family-group history
+        Telegram-->>bot: messages
+        bot->>bot: keep spend-looking lines on the machine
+        alt a send would take other talk off the machine
+            bot->>Telegram: block the send and name the invariant
+            Telegram->>closer: only spend-looking lines may leave
+        else only spend-looking lines
+            bot->>bot: apply shop-to-category map
+            opt unmapped spend-looking lines remain
+                bot->>llm: unmapped spend-looking lines
+                llm-->>bot: categories or Uncategorized
+                bot->>store: persist egress lines
+            end
+            bot->>store: persist private draft
+            bot->>Telegram: private draft
+            Telegram->>closer: Private draft
+        end
+    end
 ```
 
-**Critical flow 2: <e.g. async event propagation>** — <if applicable, otherwise N/A>.
+**Critical flow 2: handle suspects and save**
+
+```mermaid
+sequenceDiagram
+    actor closer
+    participant Telegram
+    participant bot as spendings-tracker
+    participant store as State file
+
+    closer->>Telegram: wants to save
+    Telegram->>bot: save command
+    bot->>store: load in-progress draft
+    alt no draft in progress
+        bot->>Telegram: there is no draft to save
+        Telegram->>closer: stay on Ready
+    else unhandled suspect remains
+        bot->>Telegram: every suspect line must be handled first
+        Telegram->>closer: stay on Private draft
+        closer->>Telegram: handles one suspect
+        Telegram->>bot: handle choice
+        bot->>store: persist handle
+        bot->>Telegram: updated private draft
+        Telegram->>closer: Private draft
+    else all suspects handled
+        bot->>store: save monthly close
+        alt a saved close already exists for that month
+            store-->>bot: previous close replaced
+        else first save for that month
+            store-->>bot: monthly close recorded
+        end
+        bot->>Telegram: save accepted the default-currency totals
+        Telegram->>closer: Monthly close saved then Ready
+    end
+```
 
 ## 7. Deployment view
 
