@@ -117,49 +117,45 @@ Each tactical decision in later sections should trace to one of these seeds. Tac
 
 ## 5. Building block view
 
-<!-- 🎯 Why: INTERNAL DECOMPOSITION — modules, containers, datastores. The static topology: who
-     may talk to whom. Without §5, §6 (the flows) has no vocabulary of participants.
-     📋 Write: 1 ¶ on the style (layered / hexagonal / clean / event-driven) + a folder tree + a
-     C4Container block.
-     📌 Draw ONE Container per declared `target_surface` (frontmatter): a fullstack
-     [backend-service, web-frontend] = a backend-API container + a web/SPA container; a
-     [backend-service, mobile-app] = the API + the mobile app. The Container(web, …) line below is
-     just one surface's container — swap/add per what was declared in §4. → _shared/surfaces.md
-     📌 e.g. «web app, content API, media worker, datastore, object store, CDN». -->
-
-<One paragraph: layered / hexagonal / clean / event-driven, and why.>
+This feature extends the existing `spendings_tracker` package. Hexagonal layers (`domain` / `app` / `ports` / `infra`) are already the repo convention; domain and app stay free of Telegram, vendor SDKs, and the database driver. There is no second bounded context.
 
 **Internal decomposition:**
 
 ```
-<e.g. modules/<feature>/>
-├── domain/       <entities + sentinel errors>
-├── app/          <use cases / services>
-├── infra/        <repository + integration impl>
-├── ports/        <handlers, DTOs, error mapping>
-└── wiring        <self-wiring entry point>
+src/spendings_tracker/
+├── domain/          spend-looking rule, completed UTC month, frozen categories,
+│                    shop match, draft / suspect / clean line
+├── app/             first-run, harvest-month, handle-suspect, save-close, resume
+├── ports/           CloserUiPort, HarvestPort, ModelPort, PersistencePort
+│                    (ADR-0006)
+├── infra/           telegram bot adapter, telegram user-session adapter,
+│                    language-model adapter, sqlite adapter
+└── __main__.py      construct adapters, inject at ports, run until the closer stops
 ```
 
-**C4 Container (L2):** <!-- syntax → references/c4-mermaid-syntax.md. Real names, no <placeholder> stubs. ONE Container per declared target_surface (frontmatter); the web container below is one example surface. -->
+**C4 Container (L2):**
 
 ```mermaid
 C4Container
-    title <feature> — Containers
+    title spendings-tracker — Containers
 
-    Person(actor, "<Actor>")
+    Person(closer, "Closer")
+    Person(family_poster, "Family poster")
 
-    Container_Boundary(app, "<Our system>") {
-        Container(web, "<Web/UI>", "<technology>", "<purpose>")
-        Container(api, "<API/handler>", "<technology>", "<purpose>")
-        ContainerDb(db, "<Datastore>", "<technology>", "<purpose>")
+    Container_Boundary(sys, "spendings-tracker") {
+        Container(bot, "spendings-tracker", "Python 3.12", "On-demand monthly close")
     }
 
-    System_Ext(ext, "<External>", "<purpose>")
+    ContainerDb(store, "State file", "SQLite", "Settings, map, draft, saved closes, egress")
+    System_Ext(telegram, "Telegram", "Family group history and closer private chat")
+    System_Ext(llm, "Language-model services", "Unmapped spend-looking lines only")
 
-    Rel(actor, web, "<interaction>", "<protocol>")
-    Rel(web, api, "<calls>")
-    Rel(api, db, "<reads/writes>", "<driver>")
-    Rel(api, ext, "<emits>", "<protocol>")
+    Rel(closer, telegram, "Commands and private draft", "Telegram")
+    Rel(family_poster, telegram, "Writes shop-and-amount lines", "Telegram")
+    Rel(telegram, bot, "Closer commands and group history")
+    Rel(bot, telegram, "Private draft to the closer only")
+    Rel(bot, store, "Reads and writes state", "SQLAlchemy")
+    Rel(bot, llm, "Unmapped spend-looking lines", "HTTPS")
 ```
 
 ## 6. Runtime view
