@@ -177,13 +177,46 @@ def test_close_success_and_harvest_errors_map_to_screens() -> None:
     assert refused.code == "harvest.incomplete_month"
 
 
+def _handle_pick(text: str, shop: str | None = None) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[ Handle:") and stripped.endswith("]"):
+            if shop is None or f"Handle: {shop}" in stripped:
+                return stripped
+    raise AssertionError(f"no handle pick for {shop!r} in:\n{text}")
+
+
+def test_draft_reply_shows_handle_picks_and_closer_saves_from_them() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    assert draft.screen == "SCR-04"
+    assert "[ Handle: Test Shop ]" in draft.text
+    picked = bot.handle_private("10001", "dm-1", _handle_pick(draft.text, "Test Shop"))
+    assert picked is not None
+    assert picked.screen == "SCR-05"
+    assert "Test Shop" in picked.text
+    handled = bot.handle_private("10001", "dm-1", "[ Exclude from the close ]")
+    assert handled is not None
+    assert handled.screen == "SCR-04"
+    saved = bot.handle_private("10001", "dm-1", "/save")
+    assert saved is not None
+    assert saved.screen == "SCR-06"
+    assert store.draft is None
+
+
 def test_handle_choice_returns_updated_private_draft() -> None:
     store = FakePersistence()
     bot = _ready_bot(
         store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
     )
-    bot.handle_private("10001", "dm-1", "/close 2026-08")
-    reply = bot.handle_private("10001", "dm-1", "handle l0 exclude")
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    bot.handle_private("10001", "dm-1", _handle_pick(draft.text))
+    reply = bot.handle_private("10001", "dm-1", "[ Exclude from the close ]")
     assert reply is not None
     assert reply.screen == "SCR-04"
     assert store.draft is not None
@@ -208,7 +241,8 @@ def test_save_success_and_refusals() -> None:
     assert unhandled.code == "save.unhandled_suspect"
     assert unhandled.screen == "SCR-04"
 
-    bot2.handle_private("10001", "dm-1", "handle l0 exclude")
+    bot2.handle_private("10001", "dm-1", _handle_pick(unhandled.text))
+    bot2.handle_private("10001", "dm-1", "[ Exclude from the close ]")
     saved = bot2.handle_private("10001", "dm-1", "/save")
     assert saved is not None
     assert saved.screen == "SCR-06"
@@ -281,8 +315,10 @@ def test_resume_on_start_shows_in_progress_draft_not_ready() -> None:
     bot = _ready_bot(
         store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
     )
-    bot.handle_private("10001", "dm-1", "/close 2026-08")
-    bot.handle_private("10001", "dm-1", "handle l0 exclude")
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    bot.handle_private("10001", "dm-1", _handle_pick(draft.text))
+    bot.handle_private("10001", "dm-1", "[ Exclude from the close ]")
     resumed = bot.handle_private("10001", "dm-1", "/start")
     assert resumed is not None
     assert resumed.screen == "SCR-04"
@@ -297,8 +333,9 @@ def test_pick_suspect_builds_scr05_then_returns_updated_draft() -> None:
     bot = _ready_bot(
         store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
     )
-    bot.handle_private("10001", "dm-1", "/close 2026-08")
-    picked = bot.handle_private("10001", "dm-1", "handle l0")
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    picked = bot.handle_private("10001", "dm-1", _handle_pick(draft.text))
     assert picked is not None
     assert picked.screen == "SCR-05"
     assert "Test Shop" in picked.text
@@ -308,11 +345,11 @@ def test_pick_suspect_builds_scr05_then_returns_updated_draft() -> None:
     assert "confirm uncategorized" in lowered
     assert "leave other currency" in lowered
     assert "exclude" in lowered
-    missing = bot.handle_private("10001", "dm-1", "handle l0 enter_amount")
+    missing = bot.handle_private("10001", "dm-1", "[ Enter amount ]")
     assert missing is not None
     assert missing.screen == "SCR-05"
     assert "Amount is required" in missing.text
-    handled = bot.handle_private("10001", "dm-1", "handle l0 exclude")
+    handled = bot.handle_private("10001", "dm-1", "[ Exclude from the close ]")
     assert handled is not None
     assert handled.screen == "SCR-04"
     assert "Private draft" in handled.text

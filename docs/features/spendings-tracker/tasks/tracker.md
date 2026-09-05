@@ -34,3 +34,10 @@
 | R2 | Closer-visible bot UI (S1-02–S1-04, S1-06, S1-07) | done |
 | R3 | Hygiene + tests (S2-04, S2-05) | done |
 | R4 | Runnable process / long-poll (S1-01) | done |
+
+## Review follow-up — 2026-09-05 re-review
+
+| # | Cluster | Status |
+|---|---|---|
+| R5 | SCR-04 Handle picks (S1-01) | done |
+| R6 | SCR-05 assign follow-up + AC-12 on the bot (S1-02) | todo |

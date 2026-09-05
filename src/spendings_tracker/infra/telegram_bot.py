@@ -39,6 +39,13 @@ HANDLE_ACTIONS = (
     "Leave other currency listed",
     "Exclude from the close",
 )
+HANDLE_LABELS = {
+    "Enter amount": HandleChoice.ENTER_AMOUNT,
+    "Assign category": HandleChoice.ASSIGN_CATEGORY,
+    "Confirm Uncategorized": HandleChoice.CONFIRM_UNCATEGORIZED,
+    "Leave other currency listed": HandleChoice.LEAVE_OTHER_CURRENCY,
+    "Exclude from the close": HandleChoice.EXCLUDE,
+}
 HARVEST_SCREENS = {
     "harvest.month_not_obtained": "SCR-03",
     "harvest.incomplete_month": "SCR-02",
@@ -61,6 +68,7 @@ class TelegramBot:
         self._model = model
         self._now = now
         self._pending_currency: dict[str, str] = {}
+        self._pending_line: dict[str, str] = {}
 
     def handle_group(self, user_id: str, chat_id: str, text: str) -> BotReply | None:
         return None
@@ -79,6 +87,12 @@ class TelegramBot:
             return self._close(user_id, chat_id, stripped)
         if stripped.startswith("/save"):
             return self._save(chat_id)
+        label = _bracket_label(stripped)
+        if label is not None and label.startswith("Handle:"):
+            shop = label.removeprefix("Handle:").strip()
+            return self._pick_suspect(user_id, chat_id, shop)
+        if label is not None and label in HANDLE_LABELS:
+            return self._apply_choice(user_id, chat_id, HANDLE_LABELS[label])
         if stripped.startswith("handle "):
             return self._handle(user_id, chat_id, stripped)
         if settings is None:
@@ -116,23 +130,49 @@ class TelegramBot:
             )
         return self._draft_reply(chat_id, result.draft, settings)
 
-    def _handle(self, user_id: str, chat_id: str, text: str) -> BotReply:
-        parts = text.split()
-        line_id = parts[1] if len(parts) > 1 else ""
-        choice_text = parts[2] if len(parts) > 2 else ""
-        extra = parts[3] if len(parts) > 3 else None
-        if not choice_text:
-            return self._scr05(chat_id, line_id)
-        try:
-            choice = HandleChoice(choice_text)
-        except ValueError:
-            err = catalog_error("handle.unknown_choice")
+    def _pick_suspect(self, user_id: str, chat_id: str, shop: str) -> BotReply:
+        draft = self._persistence.load_draft()
+        settings = self._persistence.load_settings()
+        if draft is None or settings is None:
+            err = catalog_error("save.no_draft")
             return BotReply(
-                chat_id=chat_id,
-                text=err.message,
-                screen="SCR-05",
-                code=err.code,
+                chat_id=chat_id, text=err.message, screen="SCR-02", code=err.code
             )
+        found = next(
+            (
+                line
+                for line in draft.lines
+                if line.shop_display == shop and not line.is_handled
+            ),
+            None,
+        )
+        if found is None:
+            err = catalog_error("draft.line_not_found")
+            return BotReply(
+                chat_id=chat_id, text=err.message, screen="SCR-05", code=err.code
+            )
+        self._pending_line[user_id] = found.id
+        return self._scr05(chat_id, found.id)
+
+    def _apply_choice(
+        self,
+        user_id: str,
+        chat_id: str,
+        choice: HandleChoice,
+        *,
+        extra: str | None = None,
+    ) -> BotReply:
+        line_id = self._pending_line.get(user_id, "")
+        return self._run_handle(user_id, chat_id, line_id, choice, extra)
+
+    def _run_handle(
+        self,
+        user_id: str,
+        chat_id: str,
+        line_id: str,
+        choice: HandleChoice,
+        extra: str | None,
+    ) -> BotReply:
         amount = extra if choice is HandleChoice.ENTER_AMOUNT else None
         category_id = extra if choice is HandleChoice.ASSIGN_CATEGORY else None
         try:
@@ -156,14 +196,51 @@ class TelegramBot:
             return self._ready(chat_id, currency)
         return self._draft_reply(chat_id, draft, settings)
 
+    def _handle(self, user_id: str, chat_id: str, text: str) -> BotReply:
+        parts = text.split()
+        line_id = parts[1] if len(parts) > 1 else ""
+        choice_text = parts[2] if len(parts) > 2 else ""
+        extra = parts[3] if len(parts) > 3 else None
+        if line_id:
+            self._pending_line[user_id] = line_id
+        if not choice_text:
+            return self._scr05(chat_id, line_id)
+        try:
+            choice = HandleChoice(choice_text)
+        except ValueError:
+            err = catalog_error("handle.unknown_choice")
+            return BotReply(
+                chat_id=chat_id,
+                text=err.message,
+                screen="SCR-05",
+                code=err.code,
+            )
+        return self._run_handle(user_id, chat_id, line_id, choice, extra)
+
     def _save(self, chat_id: str) -> BotReply:
         settings = self._persistence.load_settings()
         try:
             result = save_monthly_close(self._persistence)
         except AppError as err:
-            screen = "SCR-02" if err.code == "save.no_draft" else "SCR-04"
+            if err.code == "save.no_draft":
+                return BotReply(
+                    chat_id=chat_id, text=err.message, screen="SCR-02", code=err.code
+                )
+            draft = self._persistence.load_draft()
+            if (
+                err.code == "save.unhandled_suspect"
+                and settings is not None
+                and draft is not None
+            ):
+                body = self._draft_reply(chat_id, draft, settings)
+                return BotReply(
+                    chat_id=chat_id,
+                    text=f"{err.message}\n\n{body.text}",
+                    screen="SCR-04",
+                    code=err.code,
+                )
             return BotReply(
-                chat_id=chat_id, text=err.message, screen=screen, code=err.code
+                chat_id=chat_id, text=err.message, screen="SCR-04", code=err.code
             )
         return self._save_reply(chat_id, result, settings)
 
@@ -302,6 +379,11 @@ class TelegramBot:
             for line, domain in zip(draft.lines, domain_lines, strict=True)
             if is_suspect(domain, default_currency=currency) and not line.is_handled
         ]
+        pick_block = (
+            "\n".join(f"  [ Handle: {line.shop_display} ]" for line in suspects)
+            if suspects
+            else ""
+        )
         line_block = "\n".join(
             f"  {_line_label(line, names)}" for line in draft.lines
         )
@@ -330,7 +412,8 @@ class TelegramBot:
                 f"Lines\n{line_block}\n\n"
                 f"Totals ({currency} only)\n{total_block}\n\n"
                 f"Other currencies (listed, not mixed)\n{other_block}\n\n"
-                f"Suspects remaining: {len(suspects)}\n\n"
+                f"Suspects remaining: {len(suspects)}\n"
+                f"{pick_block}\n\n"
                 f"Egress (every line that left)\n{egress_block}"
             ),
             screen="SCR-04",
@@ -380,6 +463,13 @@ class TelegramBot:
             ),
             screen="SCR-06",
         )
+
+
+def _bracket_label(text: str) -> str | None:
+    stripped = text.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        return stripped[1:-1].strip()
+    return None
 
 
 def _line_label(line: StoredDraftLine, names: dict[str, str]) -> str:
