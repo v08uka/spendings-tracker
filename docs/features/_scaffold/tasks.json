@@ -1,0 +1,60 @@
+{
+  "slug": "_scaffold",
+  "tasks": [
+    {
+      "id": "S1",
+      "title": "Create the Python package, hexagonal folders, entry point, and Compose file",
+      "layer": "scaffold",
+      "deps": [],
+      "acs": [],
+      "dod": "project builds (empty): `uv sync` succeeds and `python -m spendings_tracker` starts then exits cleanly in a dry-run/boot probe",
+      "files_hint": [
+        "pyproject.toml",
+        "src/spendings_tracker/__init__.py",
+        "src/spendings_tracker/__main__.py",
+        "src/spendings_tracker/domain/",
+        "src/spendings_tracker/app/",
+        "src/spendings_tracker/ports/",
+        "src/spendings_tracker/infra/",
+        "Dockerfile",
+        "compose.yaml"
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Wire pytest and a smoke test that the app boots",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "empty test suite runs green; app-boots smoke test passes (`pytest`)",
+      "files_hint": ["tests/test_smoke.py"]
+    },
+    {
+      "id": "S3",
+      "title": "Set up Alembic and an initial empty migration for the SQLite file",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "the migration tool applies + reverts cleanly (`alembic upgrade head` and `alembic downgrade base`)",
+      "files_hint": ["alembic.ini", "migrations/"]
+    },
+    {
+      "id": "S4",
+      "title": "Add the CI workflow (uv sync + pytest + ruff)",
+      "layer": "scaffold",
+      "deps": ["S2"],
+      "acs": [],
+      "dod": "CI config is valid; the commands match the map machine keys (`uv sync`, `pytest`, `ruff check .`)",
+      "files_hint": [".github/workflows/ci.yml"]
+    },
+    {
+      "id": "S5",
+      "title": "Write CLAUDE.md from the foundation conventions",
+      "layer": "scaffold",
+      "deps": ["S1"],
+      "acs": [],
+      "dod": "conventions doc reflects the foundation map (layers, SQLite, ports, no frontend)",
+      "files_hint": ["CLAUDE.md"]
+    }
+  ]
+}
