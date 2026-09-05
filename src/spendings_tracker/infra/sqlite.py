@@ -436,6 +436,15 @@ class SqlitePersistence:
             egress_lines=tuple(_egress_line(row) for row in egress_rows),
         )
 
+    def load_latest_monthly_close(self) -> StoredMonthlyClose | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT utc_month FROM monthly_closes ORDER BY utc_month DESC LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return None
+        return self.load_monthly_close(row["utc_month"])
+
 
 def _draft_line(row: sqlite3.Row) -> StoredDraftLine:
     return StoredDraftLine(
