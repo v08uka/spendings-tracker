@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    environment:
+      SPENDINGS_DB_PATH: /data/spendings.sqlite
+    volumes:
+      - spendings-state:/data
+
+volumes:
+  spendings-state:

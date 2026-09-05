@@ -6,7 +6,8 @@
 ._*
 
 # Custom folder icons
-Icon
+Icon
+
 
 # Volume root files
 .DocumentRevisions-V100
@@ -30,3 +31,24 @@ Icon
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# Cursor
+.cursor/
+
+### Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# SQLite state file (Compose volume in prod; local path for alembic)
+data/*.sqlite
+data/*.sqlite-journal
+
+# Per-developer SDD / worktrees
+.claude/*.local.md
+.worktrees/
