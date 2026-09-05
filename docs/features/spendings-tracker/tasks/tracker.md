@@ -17,7 +17,7 @@
 | T10 | Add ModelPort that accepts only spend-looking lines | infra | Dell | M | T4 | done |
 | T11 | Implement complete-first-run use case | app | Dell | M | T7, T5 | done |
 | T12 | Implement harvest-month and private-draft pipeline | app | Dell | L | T8, T9, T10, T4, T11 | done |
-| T13 | Implement handle-suspect and shop-map growth | app | Dell | M | T8, T6 | todo |
+| T13 | Implement handle-suspect and shop-map growth | app | Dell | M | T8, T6 | done |
 | T14 | Implement save-monthly-close | app | Dell | M | T8, T6 | todo |
 | T15 | Implement resume-on-start | app | Dell | M | T8, T11 | todo |
 | T16 | Map first-run and AuthZ onto the closer bot | ports | Dell | M | T11 | done |
