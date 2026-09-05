@@ -68,6 +68,7 @@ class TelegramBot:
         self._model = model
         self._now = now
         self._pending_currency: dict[str, str] = {}
+        self._pending_change: set[str] = set()
         self._pending_line: dict[str, str] = {}
         self._pending_assign: set[str] = set()
         self._pending_amount: set[str] = set()
@@ -355,6 +356,27 @@ class TelegramBot:
         return self._save_reply(chat_id, result, settings)
 
     def _first_run(self, user_id: str, chat_id: str, text: str) -> BotReply:
+        label = _bracket_label(text)
+        if label is not None and label.startswith("Keep "):
+            chosen = label.removeprefix("Keep ").strip().upper()
+            self._pending_change.discard(user_id)
+            self._pending_currency[user_id] = chosen or "EUR"
+            return self._first_run_prompt(chat_id, self._pending_currency[user_id])
+        if label is not None and label.startswith("Change"):
+            self._pending_change.add(user_id)
+            return self._first_run_prompt(
+                chat_id, self._pending_currency.get(user_id, "EUR")
+            )
+        if label == "Confirm list":
+            return self._confirm_first_run(user_id, chat_id, list(PROPOSED_CATEGORIES))
+        if user_id in self._pending_change:
+            chosen = text.strip().upper()
+            self._pending_change.discard(user_id)
+            if chosen:
+                self._pending_currency[user_id] = chosen
+            return self._first_run_prompt(
+                chat_id, self._pending_currency.get(user_id, "EUR")
+            )
         lowered = text.lower()
         if lowered in {"keep", "keep eur"}:
             self._pending_currency[user_id] = "EUR"
@@ -372,25 +394,30 @@ class TelegramBot:
             names = [
                 part.strip() for part in remainder.split(",") if part.strip()
             ]
-            currency = self._pending_currency.get(user_id, "EUR")
-            try:
-                settings = complete_first_run(
-                    self._persistence,
-                    closer_identity=user_id,
-                    default_currency=currency,
-                    category_names=names,
-                )
-            except AppError as err:
-                return BotReply(
-                    chat_id=chat_id,
-                    text=err.message,
-                    screen="SCR-01",
-                    code=err.code,
-                )
-            return self._ready(chat_id, settings.default_currency)
+            return self._confirm_first_run(user_id, chat_id, names)
         return self._first_run_prompt(
             chat_id, self._pending_currency.get(user_id, "EUR")
         )
+
+    def _confirm_first_run(
+        self, user_id: str, chat_id: str, names: list[str]
+    ) -> BotReply:
+        currency = self._pending_currency.get(user_id, "EUR")
+        try:
+            settings = complete_first_run(
+                self._persistence,
+                closer_identity=user_id,
+                default_currency=currency,
+                category_names=names,
+            )
+        except AppError as err:
+            return BotReply(
+                chat_id=chat_id,
+                text=err.message,
+                screen="SCR-01",
+                code=err.code,
+            )
+        return self._ready(chat_id, settings.default_currency)
 
     def _first_run_prompt(self, chat_id: str, currency: str) -> BotReply:
         proposed = "\n".join(f" • {name}" for name in PROPOSED_CATEGORIES)
@@ -400,7 +427,8 @@ class TelegramBot:
                 "First-run setup\n"
                 f"Default currency: {currency}\n"
                 "[ Keep EUR ]  [ Change… ]\n"
-                f"Categories:\n{proposed}"
+                f"Categories:\n{proposed}\n"
+                "[ Confirm list ]"
             ),
             screen="SCR-01",
         )

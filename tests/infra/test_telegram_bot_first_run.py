@@ -81,15 +81,32 @@ def _bot(store: FakePersistence | None = None) -> TelegramBot:
     return TelegramBot(store or FakePersistence(), StubHarvest(), StubModel())
 
 
+def _token(text: str, needle: str) -> str:
+    start = 0
+    while True:
+        open_at = text.find("[", start)
+        close_at = text.find("]", open_at + 1) if open_at >= 0 else -1
+        if open_at < 0 or close_at < 0:
+            raise AssertionError(f"no token {needle!r} in:\n{text}")
+        token = text[open_at : close_at + 1]
+        if needle in token:
+            return token
+        start = close_at + 1
+
+
 def test_first_run_confirm_reaches_ready() -> None:
     bot = _bot()
     start = bot.handle_private("10001", "dm-1", "/start")
-    confirm = bot.handle_private("10001", "dm-1", "confirm Groceries, Transport")
-
     assert start is not None
     assert start.screen == "SCR-01"
+    keep = bot.handle_private("10001", "dm-1", _token(start.text, "Keep EUR"))
+    assert keep is not None
+    confirm = bot.handle_private("10001", "dm-1", _token(keep.text, "Confirm list"))
+
     assert "Keep EUR" in start.text
     assert "Change" in start.text
+    assert "Confirm list" in start.text
+    assert keep.screen == "SCR-01"
     assert confirm is not None
     assert confirm.screen == "SCR-02"
     assert "Monthly closes can start" in confirm.text
@@ -100,14 +117,17 @@ def test_first_run_can_choose_a_currency_other_than_eur() -> None:
     store = FakePersistence()
     bot = _bot(store)
     start = bot.handle_private("10001", "dm-1", "/start")
-    change = bot.handle_private("10001", "dm-1", "change USD")
-    confirm = bot.handle_private("10001", "dm-1", "confirm Groceries")
-
     assert start is not None
-    assert "Keep EUR" in start.text
+    change = bot.handle_private("10001", "dm-1", _token(start.text, "Change"))
     assert change is not None
+    typed = bot.handle_private("10001", "dm-1", "USD")
+    assert typed is not None
+    confirm = bot.handle_private("10001", "dm-1", _token(typed.text, "Confirm list"))
+
+    assert "Keep EUR" in start.text
     assert change.screen == "SCR-01"
-    assert "USD" in change.text
+    assert typed.screen == "SCR-01"
+    assert "USD" in typed.text
     assert confirm is not None
     assert confirm.screen == "SCR-02"
     assert store.settings is not None
@@ -118,7 +138,8 @@ def test_first_run_can_choose_a_currency_other_than_eur() -> None:
 
 def test_empty_list_and_close_before_confirm_are_contract_errors() -> None:
     bot = _bot()
-    bot.handle_private("10001", "dm-1", "/start")
+    start = bot.handle_private("10001", "dm-1", "/start")
+    assert start is not None
     empty = bot.handle_private("10001", "dm-1", "confirm")
     close = bot.handle_private("10001", "dm-1", "/close 2026-08")
 
@@ -133,8 +154,10 @@ def test_empty_list_and_close_before_confirm_are_contract_errors() -> None:
 def test_non_closer_gets_auth_error_without_draft_or_close_detail() -> None:
     store = FakePersistence()
     bot = _bot(store)
-    bot.handle_private("10001", "dm-1", "/start")
-    bot.handle_private("10001", "dm-1", "confirm Groceries")
+    start = bot.handle_private("10001", "dm-1", "/start")
+    assert start is not None
+    bot.handle_private("10001", "dm-1", _token(start.text, "Keep EUR"))
+    bot.handle_private("10001", "dm-1", _token(start.text, "Confirm list"))
 
     reply = bot.handle_private("10002", "dm-2", "/close 2026-08")
     group = bot.handle_group("10002", "group-1", "what about the draft totals")
