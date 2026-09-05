@@ -11,7 +11,7 @@
 | T4 | Encode spend-looking detection and pair splitting | domain | Dell | M | — | done |
 | T5 | Encode completed-month, shop-key, and frozen-category rules | domain | Dell | M | — | done |
 | T6 | Encode draft, suspect, handle, and total rules | domain | Dell | M | — | done |
-| T7 | Persist settings, categories, and shop mappings | infra | Dell | M | T1, T5 | todo |
+| T7 | Persist settings, categories, and shop mappings | infra | Dell | M | T1, T5 | done |
 | T8 | Persist drafts, monthly closes, and egress lines | infra | Dell | M | T2, T3, T6, T7 | todo |
 | T9 | Add HarvestPort and the user-session harvest adapter | infra | Dell | L | — | done |
 | T10 | Add ModelPort that accepts only spend-looking lines | infra | Dell | M | T4 | todo |
