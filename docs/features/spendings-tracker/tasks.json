@@ -270,6 +270,54 @@
         "src/spendings_tracker/infra/telegram_bot.py",
         "tests/infra/test_telegram_bot_close.py"
       ]
+    },
+    {
+      "id": "R9",
+      "title": "Obtain a completed month from the Telethon date window",
+      "layer": "infra",
+      "deps": ["T9"],
+      "acs": ["AC-03", "AC-17"],
+      "dod": "TelethonFamilyGroupReader harvests [start, end) (offset_date is not the month end with reverse=True). A reader test with a fake client keeps in-month messages, drops outside ones, and does not drop a 501-message month.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_session.py",
+        "tests/infra/test_telegram_session.py"
+      ]
+    },
+    {
+      "id": "R10",
+      "title": "Drive first-run from published SCR-01 tokens",
+      "layer": "ports",
+      "deps": ["T16"],
+      "acs": ["AC-01", "AC-14"],
+      "dod": "SCR-01 publishes [ Keep EUR ], [ Change… ], and [ Confirm list ]. First-run tests reach Ready using only those tokens (Keep/Change via _bracket_label; Confirm list uses the proposed names).",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_first_run.py"
+      ]
+    },
+    {
+      "id": "R11",
+      "title": "Ignore Telethon session and .env secrets",
+      "layer": "wiring",
+      "deps": [],
+      "acs": [],
+      "dod": ".gitignore covers data/*.session* (and Telethon journal siblings) and .env so the user-session login file cannot be committed.",
+      "files_hint": [
+        ".gitignore",
+        "tests/infra/test_gitignore_secrets.py"
+      ]
+    },
+    {
+      "id": "R12",
+      "title": "Clear leftover follow-up state on /start and a new Handle pick",
+      "layer": "ports",
+      "deps": ["R7"],
+      "acs": ["AC-11"],
+      "dod": "/start and a new Handle pick call _clear_follow_ups. Bot tests: Enter amount then /start returns SCR-04 and a later 99.00 does not write the line; assign then /start then [ Groceries ] does not assign.",
+      "files_hint": [
+        "src/spendings_tracker/infra/telegram_bot.py",
+        "tests/infra/test_telegram_bot_close.py"
+      ]
     }
   ]
 }

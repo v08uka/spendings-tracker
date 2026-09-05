@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from spendings_tracker.app.errors import catalog_error
@@ -59,8 +59,11 @@ class TelethonFamilyGroupReader:
             if entity is None or entity == "":
                 raise OSError("TELEGRAM_FAMILY_GROUP is not set")
             target = int(entity) if entity.lstrip("-").isdigit() else entity
+            # reverse=True inverts offset_date (still exclusive). Start just
+            # before the month so midnight-on-the-1st is included.
+            offset = start - timedelta(microseconds=1)
             for message in client.iter_messages(
-                target, offset_date=end, reverse=True
+                target, offset_date=offset, reverse=True
             ):
                 when = message.date
                 if when is None:

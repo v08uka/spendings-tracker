@@ -53,3 +53,12 @@
 | # | Cluster | Status |
 |---|---|---|
 | R8 | Clear leftover amount-prompt state (S2-01) | done |
+
+## Review follow-up — 2026-09-05 re-review 4
+
+| # | Cluster | Status |
+|---|---|---|
+| R9 | Harvest date window (S1-01) | done |
+| R10 | SCR-01 published tokens (S1-02) | todo |
+| R11 | Ignore session secrets (S2-02) | todo |
+| R12 | Clear leftover follow-ups on /start and re-pick (S2-03) | todo |
