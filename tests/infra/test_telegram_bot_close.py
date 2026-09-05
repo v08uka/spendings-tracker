@@ -441,6 +441,37 @@ def test_enter_amount_from_scr05_prompt_updates_picked_line() -> None:
     assert store.draft.lines[1].is_handled is False
 
 
+def test_exclude_after_enter_amount_prompt_still_resumes_on_start() -> None:
+    store = FakePersistence()
+    bot = _ready_bot(
+        store, FakeHarvest([FamilyGroupMessage("1", "Test Shop 12.00")])
+    )
+    draft = bot.handle_private("10001", "dm-1", "/close 2026-08")
+    assert draft is not None
+    picked = bot.handle_private("10001", "dm-1", _handle_pick(draft.text))
+    assert picked is not None
+    prompt = bot.handle_private("10001", "dm-1", "[ Enter amount ]")
+    assert prompt is not None
+    assert prompt.screen == "SCR-05"
+    assert "Enter the amount" in prompt.text
+    excluded = bot.handle_private("10001", "dm-1", "[ Exclude from the close ]")
+    assert excluded is not None
+    assert excluded.screen == "SCR-04"
+    assert "Private draft" in excluded.text
+    resumed = bot.handle_private("10001", "dm-1", "/start")
+    assert resumed is not None
+    assert resumed.screen == "SCR-04"
+    assert "Private draft" in resumed.text
+    assert "Amount is required" not in resumed.text
+    leftover = bot.handle_private("10001", "dm-1", "99.00")
+    assert leftover is not None
+    assert leftover.screen == "SCR-04"
+    assert "Private draft" in leftover.text
+    assert store.draft is not None
+    assert store.draft.lines[0].is_excluded is True
+    assert store.draft.lines[0].amount == "12.00"
+
+
 def test_malformed_close_and_unknown_handle_are_app_errors() -> None:
     store = FakePersistence()
     bot = _ready_bot(

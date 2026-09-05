@@ -72,6 +72,10 @@ class TelegramBot:
         self._pending_assign: set[str] = set()
         self._pending_amount: set[str] = set()
 
+    def _clear_follow_ups(self, user_id: str) -> None:
+        self._pending_amount.discard(user_id)
+        self._pending_assign.discard(user_id)
+
     def handle_group(self, user_id: str, chat_id: str, text: str) -> BotReply | None:
         return None
 
@@ -171,11 +175,14 @@ class TelegramBot:
     ) -> BotReply:
         line_id = self._pending_line.get(user_id, "")
         if choice is HandleChoice.ASSIGN_CATEGORY and extra is None:
+            self._pending_amount.discard(user_id)
             self._pending_assign.add(user_id)
             return self._scr05_assign(chat_id, line_id)
         if choice is HandleChoice.ENTER_AMOUNT and extra is None:
+            self._pending_assign.discard(user_id)
             self._pending_amount.add(user_id)
             return self._scr05_amount(chat_id, line_id)
+        self._clear_follow_ups(user_id)
         return self._run_handle(user_id, chat_id, line_id, choice, extra)
 
     def _assign_named_category(
@@ -208,7 +215,7 @@ class TelegramBot:
             user_id, chat_id, line_id, HandleChoice.ENTER_AMOUNT, extra
         )
         if reply.code != "handle.invalid_amount":
-            self._pending_amount.discard(user_id)
+            self._clear_follow_ups(user_id)
         return reply
 
     def _scr05_amount(self, chat_id: str, line_id: str) -> BotReply:
@@ -285,10 +292,13 @@ class TelegramBot:
                 category_id=category_id,
             )
         except AppError as err:
+            if err.code != "handle.invalid_amount":
+                self._clear_follow_ups(user_id)
             screen = "SCR-02" if err.code == "save.no_draft" else "SCR-05"
             return BotReply(
                 chat_id=chat_id, text=err.message, screen=screen, code=err.code
             )
+        self._clear_follow_ups(user_id)
         settings = self._persistence.load_settings()
         draft = self._persistence.load_draft()
         if settings is None or draft is None:

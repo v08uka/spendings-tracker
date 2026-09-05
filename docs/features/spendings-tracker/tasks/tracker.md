@@ -47,3 +47,9 @@
 | # | Cluster | Status |
 |---|---|---|
 | R7 | SCR-05 enter_amount follow-up (S1-01) | done |
+
+## Review follow-up — 2026-09-05 re-review 3
+
+| # | Cluster | Status |
+|---|---|---|
+| R8 | Clear leftover amount-prompt state (S2-01) | done |
