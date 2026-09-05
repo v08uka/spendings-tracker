@@ -14,7 +14,7 @@
 | T7 | Persist settings, categories, and shop mappings | infra | Dell | M | T1, T5 | done |
 | T8 | Persist drafts, monthly closes, and egress lines | infra | Dell | M | T2, T3, T6, T7 | todo |
 | T9 | Add HarvestPort and the user-session harvest adapter | infra | Dell | L | — | done |
-| T10 | Add ModelPort that accepts only spend-looking lines | infra | Dell | M | T4 | todo |
+| T10 | Add ModelPort that accepts only spend-looking lines | infra | Dell | M | T4 | done |
 | T11 | Implement complete-first-run use case | app | Dell | M | T7, T5 | todo |
 | T12 | Implement harvest-month and private-draft pipeline | app | Dell | L | T8, T9, T10, T4, T11 | todo |
 | T13 | Implement handle-suspect and shop-map growth | app | Dell | M | T8, T6 | todo |
