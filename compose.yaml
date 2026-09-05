@@ -3,6 +3,8 @@ services:
     build: .
     environment:
       SPENDINGS_DB_PATH: /data/spendings.sqlite
+      TELEGRAM_SESSION_PATH: /data/telegram.session
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     volumes:
       - spendings-state:/data
 

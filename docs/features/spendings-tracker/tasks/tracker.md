@@ -22,6 +22,6 @@
 | T15 | Implement resume-on-start | app | Dell | M | T8, T11 | done |
 | T16 | Map first-run and AuthZ onto the closer bot | ports | Dell | M | T11 | done |
 | T17 | Map harvest, draft, handle, and save onto the closer bot | ports | Dell | L | T12, T13, T14, T16 | done |
-| T18 | Wire the process and prove the quality goals | wiring | Dell | M | T15, T17, T9, T10 | todo |
+| T18 | Wire the process and prove the quality goals | wiring | Dell | M | T15, T17, T9, T10 | done |
 
 **Total:** 18 tasks, ~16 person-days.
